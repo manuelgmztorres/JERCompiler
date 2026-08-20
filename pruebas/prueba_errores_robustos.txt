@@ -1,0 +1,24 @@
+# Declaración e inicializador de arreglo incompletos.
+ENT datos[3 -> [1, 2];
+ENT vacio[] -> [];
+
+FUN parametroInvalido(ENT limite, valor) {
+    RET limite;
+}
+
+FUN indiceInvalido() {
+    datos[0 -> 3;
+}
+
+FUN cadenaInvalida() {
+    IMP "cadena sin cerrar
+}
+
+FUN condicionInvalida(ENT limite) {
+    SI limite { IMP limite; }
+}
+
+# Texto inválido al nivel global: el análisis debe continuar.
+}
+ENT posterior -> 42;
+ENT precio -> 100$;

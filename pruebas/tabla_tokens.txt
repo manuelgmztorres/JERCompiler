@@ -1,0 +1,4 @@
+TABLA DE TOKENS - JERCompiler
+Archivo: pruebas\prueba_comentario_sin_cierre.txt
+No.   | Lexema               | Token                        | Línea  | Columna
+------+----------------------+------------------------------+--------+--------

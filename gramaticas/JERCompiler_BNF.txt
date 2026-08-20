@@ -1,0 +1,108 @@
+GRAMÁTICA BNF - JERCompiler
+===========================
+
+Esta referencia describe la gramática formal y el esquema sintáctico del lenguaje
+general JER implementado en analizador/JERCompiler.jj.
+
+PROGRAMA
+--------
+
+<Programa> ::= ( <DeclaracionGlobal> | <DeclaracionFuncion> )* EOF
+
+<DeclaracionGlobal> ::= ( <DeclaracionVariable> | <DeclaracionConstante> ) ';'
+
+DECLARACIONES Y ARREGLOS
+------------------------
+
+<DeclaracionVariable>  ::= <TipoDato> IDENTIFICADOR <Dimensiones> '->' <Expresion>
+<DeclaracionConstante> ::= 'CONST' <TipoDato> IDENTIFICADOR <Dimensiones> '->' <Expresion>
+<Dimensiones>          ::= ( '[' <Expresion> ']' )*
+
+<TipoDato> ::= 'ENT' | 'DEC' | 'CAD' | 'CAR' | 'BOO'
+
+Las dimensiones se especifican entre corchetes para arreglos y matrices:
+  ENT edades[3] -> [18, 20, 21];
+  DEC notas[2][2] -> [[9.5, 8.0], [7.0, 10.0]];
+
+FUNCIONES Y SENTENCIAS
+----------------------
+
+<DeclaracionFuncion> ::= 'FUN' IDENTIFICADOR '(' <ListaParametros>? ')' <Bloque>
+<ListaParametros>    ::= <Parametro> ( ',' <Parametro> )*
+<Parametro>          ::= <TipoDato> IDENTIFICADOR
+<Bloque>             ::= '{' <Sentencia>* '}'
+
+<Sentencia> ::= <DeclaracionVariable> ';'
+              | <DeclaracionConstante> ';'
+              | <AsignacionOLlamada>
+              | <EstructuraSi>
+              | <EstructuraMientras>
+              | <EstructuraRepetir>
+              | <EstructuraEvaluar>
+              | 'IMP' <Expresion> ';'
+              | 'OBT' IDENTIFICADOR ';'
+              | 'RET' <Expresion> ';'
+              | 'TERMINAR' ';'
+
+<AsignacionOLlamada> ::= IDENTIFICADOR '(' <Argumentos>? ')' ';'
+                       | IDENTIFICADOR ( '++' | '--' ) ';'
+                       | IDENTIFICADOR <Acceso>+ ( ( '++' | '--' ) ';' | <OperadorAsignacion> <Expresion> ';' )
+                       | IDENTIFICADOR <OperadorAsignacion> <Expresion> ';'
+
+<OperadorAsignacion> ::= '->' | '+->' | '-->'
+<Acceso>             ::= '[' <Expresion> ']'
+<Argumentos>         ::= <Expresion> ( ',' <Expresion> )*
+
+CONTROL DE FLUJO
+----------------
+
+<EstructuraSi>       ::= 'SI' <Condicion> <Bloque> ( 'SINO' <Bloque> )?
+<EstructuraMientras> ::= 'MIENTRAS' <Condicion> <Bloque>
+<EstructuraRepetir>  ::= 'REPETIR' <Expresion> <Bloque>
+<EstructuraEvaluar>  ::= 'EVALUAR' <Expresion> '{'
+                         ( 'CUANDO' <Expresion> ':' <Sentencia>* )+
+                         ( 'PRED' ':' <Sentencia>* )? '}'
+
+<Condicion>           ::= <ExpresionLogica>
+<ExpresionLogica>     ::= <ExpresionRelacional> ( ( 'AND' | 'OR' ) <ExpresionRelacional> )*
+<ExpresionRelacional> ::= '(' <ExpresionLogica> ')'
+                        | ( 'NOT' )? <Expresion> <OperadorRelacional> <Expresion>
+<OperadorRelacional>  ::= '=' | '!=' | '>' | '<' | '>=' | '<='
+
+EXPRESIONES Y OPERACIONES
+-------------------------
+
+<Expresion>      ::= <Termino> ( ( '+' | '-' ) <Termino> )*
+<Termino>        ::= <Factor> ( ( '*' | '/' | '%' ) <Factor> )*
+<Factor>         ::= <Base> ( ( '**' | '//' ) <Base> )*
+<Base>           ::= '-' <Base>
+                   | IDENTIFICADOR '(' <Argumentos>? ')'
+                   | '(' <Expresion> ')'
+                   | <LiteralArreglo>
+                   | <Valor>
+
+<LiteralArreglo> ::= '[' ( <Expresion> ( ',' <Expresion> )* )? ']'
+<Valor>          ::= NUMERO_ENTERO | NUMERO_DECIMAL | CADENA | CARACTER
+                   | 'VERDADERO' | 'FALSO' | IDENTIFICADOR <Acceso>*
+
+LÉXICO Y COMENTARIOS
+--------------------
+
+- Comentarios de línea: Comienzan con '#' hasta el final de la línea.
+- Comentarios de bloque: Inician con '/**' y finalizan con '**/'.
+- Operadores aritméticos: '+' (suma), '-' (resta/unario), '*' (mult), '/' (div),
+  '%' (módulo), '**' (potencia), '//' (raíz cuadrada).
+- Asignaciones: '->' (asignación), '+->' (suma y asigna), '-->' (resta y asigna).
+- Comparación de igualdad: '=' (se usa un solo signo igual para comparar).
+
+ESTRATEGIA DE RECUPERACIÓN DE ERRORES (MODO PÁNICO)
+---------------------------------------------------
+
+1. Desacoplamiento Jerárquico: Errores en cabeceras de funciones o estructuras
+   (SI, MIENTRAS, EVALUAR) reportan el fallo y sincronizan con '{', permitiendo
+   analizar todas las sentencias internas del bloque.
+2. Sincronización por FIRST(Sentencia): Si una instrucción no tiene ';', el
+   recuperador se detiene al detectar el inicio de la siguiente sentencia
+   (ENT, DEC, SI, IMP, etc.), evitando que una línea rota devore las siguientes.
+3. Resiliencia de Bloques: Si falta la llave '{', se reporta el error y se
+   analiza la instrucción siguiente como cuerpo provisional.

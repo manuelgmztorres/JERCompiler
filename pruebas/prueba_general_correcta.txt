@@ -1,0 +1,23 @@
+# Declaraciones globales, arreglos y matrices.
+ENT edades[3] -> [18, 20, 21];
+DEC calificaciones[2][2] -> [[9.5, 8.0], [7.0, 10.0]];
+CONST CAD titulo -> "Reporte";
+
+FUN promedio(DEC total, ENT cantidad) {
+    DEC resultado -> total / cantidad;
+    RET resultado;
+}
+
+FUN principal() {
+    ENT indice -> 0;
+    calificaciones[indice][1] -> promedio(20.0, 2);
+    SI indice >= 0 {
+        IMP titulo;
+    } SINO {
+        OBT indice;
+    }
+    MIENTRAS indice < 3 {
+        edades[indice]++;
+        indice +-> 1;
+    }
+}

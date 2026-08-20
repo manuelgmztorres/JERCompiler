@@ -1,0 +1,390 @@
+options { IGNORE_CASE = false; STATIC = false; }
+
+PARSER_BEGIN(JERCompiler)
+public class JERCompiler {
+  static int totalCadenas = 0;
+  static int totalErrores = 0;
+  private int profundidadFuncion = 0;
+
+  public static void main(String[] args) { ManejadorErrores.ejecutar(args); }
+  static void reiniciarContadores() { totalCadenas = 0; totalErrores = 0; }
+  void reportarError(ParseException e) { ManejadorErrores.reportarError(e); }
+
+  void recuperarHasta(int... destinos) {
+    Token t;
+    do {
+      t = getToken(1);
+      if (t.kind == EOF) return;
+      for (int destino : destinos) {
+        if (t.kind == destino) return;
+      }
+      getNextToken();
+    } while (true);
+  }
+
+  void recuperarGlobal() {
+    Token t = getToken(1);
+    if (t.kind == EOF) return;
+    getNextToken();
+    do {
+      t = getToken(1);
+      if (t.kind == EOF || t.kind == FUN || t.kind == CONST || t.kind == TIPO_ENT
+          || t.kind == TIPO_DEC || t.kind == TIPO_CAD || t.kind == TIPO_CAR || t.kind == TIPO_BOO) return;
+      getNextToken();
+      if (t.kind == FIN_INSTRUCCION) return;
+    } while (true);
+  }
+
+  void recuperarSentencia() {
+    Token t = getToken(1);
+    if (t.kind == EOF || t.kind == CIERRE_BLOQUE) return;
+    getNextToken();
+    do {
+      t = getToken(1);
+      if (t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
+      if (ManejadorErrores.esInicioDeSentencia(t.kind)) return;
+      getNextToken();
+      if (t.kind == FIN_INSTRUCCION) return;
+    } while (true);
+  }
+
+  void recuperarCabeceraBloque() {
+    Token t;
+    do {
+      t = getToken(1);
+      if (t.kind == EOF || t.kind == APERTURA_BLOQUE || t.kind == CIERRE_BLOQUE || t.kind == FIN_INSTRUCCION
+          || ManejadorErrores.esInicioDeSentencia(t.kind)) return;
+      getNextToken();
+    } while (true);
+  }
+}
+PARSER_END(JERCompiler)
+
+SKIP : { " " | "\t" | "\r" | "\n" }
+SKIP : { < COMENTARIO_LINEA: "#" (~["\n","\r"])* ("\n"|"\r"|"\r\n")? > }
+SKIP : { "/**" : ESTADO_COMENTARIO }
+<ESTADO_COMENTARIO> SKIP : { "**/" : DEFAULT | < ~[] > }
+
+TOKEN : {
+    < TIPO_ENT: "ENT" > | < TIPO_DEC: "DEC" > | < TIPO_CAD: "CAD" >
+  | < TIPO_CAR: "CAR" > | < TIPO_BOO: "BOO" > | < CONST: "CONST" >
+}
+TOKEN : {
+    < SI: "SI" > | < SINO: "SINO" > | < MIENTRAS: "MIENTRAS" > | < REPETIR: "REPETIR" >
+  | < EVALUAR: "EVALUAR" > | < CUANDO: "CUANDO" > | < PRED: "PRED" > | < TERMINAR: "TERMINAR" >
+  | < FUN: "FUN" > | < RET: "RET" > | < OBT: "OBT" > | < IMP: "IMP" >
+}
+TOKEN : { < VERDADERO: "VERDADERO" > | < FALSO: "FALSO" > }
+TOKEN : {
+    < NUMERO_DECIMAL: (["0"-"9"])+ "." (["0"-"9"])+ > | < NUMERO_ENTERO: (["0"-"9"])+ >
+  | < CADENA: "\"" (~["\"","\\","\n","\r"] | "\\" ~[])* "\"" >
+  | < CARACTER: "'" (~["'", "\\", "\n", "\r"] | "\\" ~[]) "'" >
+  | < STRING_NO_CERRADA: "\"" (~["\"","\n","\r"])* >
+  | < CARACTER_INVALIDO: "'" (~["'","\n","\r"])* ("'" | "") >
+}
+TOKEN : {
+    < ASIG_INC: "+->" > | < ASIG_DEC: "-->" > | < ASIGNACION: "->" >
+  | < POTENCIA: "**" > | < RAIZ: "//" > | < INC: "++" > | < DEC_OP: "--" >
+  | < MAYOR_IGUAL: ">=" > | < MENOR_IGUAL: "<=" > | < DIFERENTE: "!=" >
+  | < SUMA: "+" > | < RESTA: "-" > | < MULT: "*" > | < DIV: "/" > | < MODULO: "%" >
+  | < IGUAL: "=" > | < MAYOR_QUE: ">" > | < MENOR_QUE: "<" >
+  | < AND: "AND" > | < OR: "OR" > | < NOT: "NOT" >
+}
+TOKEN : {
+    < APERTURA_PAREN: "(" > | < CIERRE_PAREN: ")" > | < APERTURA_BLOQUE: "{" >
+  | < CIERRE_BLOQUE: "}" > | < APERTURA_CORCHETE: "[" > | < CIERRE_CORCHETE: "]" >
+  | < FIN_INSTRUCCION: ";" > | < SEPARADOR: "," > | < DOS_PUNTOS: ":" >
+}
+TOKEN : { < IDENTIFICADOR: ["a"-"z","A"-"Z"] (["a"-"z","A"-"Z","0"-"9","_"])* > }
+TOKEN : { < ERROR_LEXICO: ~[] > }
+
+void Programa() : {}
+{
+  (
+    try {
+        LOOKAHEAD(<FUN>) DeclaracionFuncion()
+      | LOOKAHEAD(<CONST> | TipoDato() <IDENTIFICADOR>) DeclaracionGlobal()
+      | ElementoGlobalInvalido()
+    } catch (ParseException e) {
+      reportarError(e);
+      recuperarGlobal();
+    }
+  )*
+  <EOF>
+}
+
+void ElementoGlobalInvalido() : { Token t; }
+{
+  t=TokenCualquiera()
+  {
+    if (t.kind == RET) {
+      ManejadorErrores.reportarRetornoFueraFuncion(t);
+    } else {
+      ManejadorErrores.reportarTokenFueraDeContexto(t, "nivel global");
+    }
+    recuperarGlobal();
+  }
+}
+
+void DeclaracionGlobal() : {}
+{
+  try {
+    ( LOOKAHEAD(<CONST>) DeclaracionConstante() | DeclaracionVariable() ) <FIN_INSTRUCCION>
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarGlobal();
+  }
+}
+
+void DeclaracionVariable() :
+{ Token tipo; Token id; }
+{
+  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> Expresion()
+}
+
+void DeclaracionConstante() :
+{ Token tipo; Token id; }
+{
+  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> Expresion()
+}
+
+void DimensionesDeclaracion() : {}
+{ ( <APERTURA_CORCHETE> Expresion() <CIERRE_CORCHETE> )* }
+
+Token TipoDato() : { Token tipo; }
+{
+    tipo=<TIPO_ENT> { return tipo; }
+  | tipo=<TIPO_DEC> { return tipo; }
+  | tipo=<TIPO_CAD> { return tipo; }
+  | tipo=<TIPO_CAR> { return tipo; }
+  | tipo=<TIPO_BOO> { return tipo; }
+}
+
+void DeclaracionFuncion() : {}
+{
+  try {
+    <FUN> <IDENTIFICADOR> <APERTURA_PAREN>
+    ( ListaParametros() )?
+    <CIERRE_PAREN>
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarCabeceraBloque();
+  }
+  { profundidadFuncion++; }
+  Bloque()
+  { profundidadFuncion--; }
+}
+
+void ListaParametros() : {}
+{
+  Parametro() ( <SEPARADOR> Parametro() )*
+}
+
+void Parametro() : { Token tipo; Token id; }
+{
+  try {
+    tipo=TipoDato() id=<IDENTIFICADOR>
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarHasta(SEPARADOR, CIERRE_PAREN, EOF);
+  }
+}
+
+void Bloque() : {}
+{
+  try {
+    <APERTURA_BLOQUE>
+    ( LOOKAHEAD({ getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF }) Sentencia() )*
+    <CIERRE_BLOQUE>
+  } catch (ParseException e) {
+    reportarError(e);
+    if (getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF && getToken(1).kind != SINO) {
+      Sentencia();
+      if (getToken(1).kind == CIERRE_BLOQUE) {
+        getNextToken();
+      }
+    }
+  }
+}
+
+void Sentencia() : {}
+{
+  try {
+    (
+        LOOKAHEAD(TipoDato() <IDENTIFICADOR>) DeclaracionVariable() <FIN_INSTRUCCION>
+      | LOOKAHEAD(<CONST>) DeclaracionConstante() <FIN_INSTRUCCION>
+      | LOOKAHEAD(<SI>) EstructuraSi()
+      | LOOKAHEAD(<MIENTRAS>) EstructuraMientras()
+      | LOOKAHEAD(<REPETIR>) EstructuraRepetir()
+      | LOOKAHEAD(<EVALUAR>) EstructuraEvaluar()
+      | LOOKAHEAD(<IMP>) <IMP> Expresion() <FIN_INSTRUCCION>
+      | LOOKAHEAD(<OBT>) <OBT> <IDENTIFICADOR> <FIN_INSTRUCCION>
+      | LOOKAHEAD(<TERMINAR>) <TERMINAR> <FIN_INSTRUCCION>
+      | LOOKAHEAD(<RET>) SentenciaRetorno()
+      | LOOKAHEAD(<IDENTIFICADOR>) AsignacionOLlamada()
+      | SentenciaInvalida()
+    )
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarSentencia();
+  }
+}
+
+void SentenciaRetorno() : { Token t; }
+{
+  t=<RET> {
+    if (profundidadFuncion == 0) ManejadorErrores.reportarRetornoFueraFuncion(t);
+  }
+  Expresion() <FIN_INSTRUCCION>
+}
+
+void SentenciaInvalida() : { Token t; }
+{
+  t=TokenCualquiera()
+  {
+    ManejadorErrores.reportarTokenFueraDeContexto(t, "bloque de sentencias");
+    recuperarSentencia();
+  }
+}
+
+void AsignacionOLlamada() : {}
+{
+  <IDENTIFICADOR>
+  (
+      LlamadaFuncionSinId() <FIN_INSTRUCCION>
+    | ( <INC> | <DEC_OP> ) <FIN_INSTRUCCION>
+    | ( <APERTURA_CORCHETE> Expresion() <CIERRE_CORCHETE> )+
+      (
+          ( <INC> | <DEC_OP> ) <FIN_INSTRUCCION>
+        | OperadorAsignacion() Expresion() <FIN_INSTRUCCION>
+      )
+    | OperadorAsignacion() Expresion() <FIN_INSTRUCCION>
+  )
+}
+
+void OperadorAsignacion() : {}
+{
+  <ASIGNACION> | <ASIG_INC> | <ASIG_DEC>
+}
+
+void EstructuraSi() : {}
+{
+  <SI>
+  try {
+    Condicion()
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarCabeceraBloque();
+  }
+  Bloque()
+  (
+    LOOKAHEAD(<SINO>)
+    <SINO>
+    Bloque()
+  )?
+}
+
+void EstructuraMientras() : {}
+{
+  <MIENTRAS>
+  try {
+    Condicion()
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarCabeceraBloque();
+  }
+  Bloque()
+}
+
+void EstructuraRepetir() : {}
+{
+  <REPETIR>
+  try {
+    Expresion()
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarCabeceraBloque();
+  }
+  Bloque()
+}
+
+void EstructuraEvaluar() : {}
+{
+  <EVALUAR>
+  try {
+    Expresion()
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarCabeceraBloque();
+  }
+  <APERTURA_BLOQUE>
+  (
+    <CUANDO>
+    try {
+      Expresion() <DOS_PUNTOS>
+    } catch (ParseException e) {
+      reportarError(e);
+      recuperarHasta(CUANDO, PRED, CIERRE_BLOQUE, EOF);
+    }
+    ( LOOKAHEAD({ getToken(1).kind != CUANDO && getToken(1).kind != PRED && getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF }) Sentencia() )*
+  )+
+  (
+    <PRED> <DOS_PUNTOS>
+    ( LOOKAHEAD({ getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF }) Sentencia() )*
+  )?
+  <CIERRE_BLOQUE>
+}
+
+void Condicion() : {}
+{ ExpresionLogica() }
+
+void ExpresionLogica() : {}
+{ ExpresionRelacional() ( ( <AND> | <OR> ) ExpresionRelacional() )* }
+
+void ExpresionRelacional() : {}
+{ LOOKAHEAD(<APERTURA_PAREN>) <APERTURA_PAREN> ExpresionLogica() <CIERRE_PAREN> | ( <NOT> )? Expresion() OperadorRelacional() Expresion() }
+
+void OperadorRelacional() : {}
+{ <IGUAL> | <MAYOR_QUE> | <MENOR_QUE> | <MAYOR_IGUAL> | <MENOR_IGUAL> | <DIFERENTE> }
+
+void Expresion() : {}
+{ Termino() ( ( <SUMA> | <RESTA> ) Termino() )* }
+
+void Termino() : {}
+{ Factor() ( ( <MULT> | <DIV> | <MODULO> ) Factor() )* }
+
+void Factor() : {}
+{ Base() ( ( <POTENCIA> | <RAIZ> ) Base() )* }
+
+void Base() : {}
+{ <RESTA> Base() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Expresion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
+
+void LiteralArreglo() : {}
+{ <APERTURA_CORCHETE> ( Expresion() ( <SEPARADOR> Expresion() )* )? <CIERRE_CORCHETE> }
+
+void ValorSimple() : {}
+{ <NUMERO_DECIMAL> | <NUMERO_ENTERO> | <CADENA> { totalCadenas++; } | <CARACTER> | <VERDADERO> | <FALSO> | <IDENTIFICADOR> ( <APERTURA_CORCHETE> Expresion() <CIERRE_CORCHETE> )* }
+
+void LlamadaFuncion() : {}
+{ <IDENTIFICADOR> LlamadaFuncionSinId() }
+
+void LlamadaFuncionSinId() : {}
+{ <APERTURA_PAREN> ( Expresion() ( <SEPARADOR> Expresion() )* )? <CIERRE_PAREN> }
+
+Token TokenCualquiera() : { Token t; }
+{
+  (
+      t=<TIPO_ENT> | t=<TIPO_DEC> | t=<TIPO_CAD> | t=<TIPO_CAR> | t=<TIPO_BOO> | t=<CONST>
+    | t=<SI> | t=<SINO> | t=<MIENTRAS> | t=<REPETIR> | t=<EVALUAR> | t=<CUANDO> | t=<PRED>
+    | t=<TERMINAR> | t=<FUN> | t=<RET> | t=<OBT> | t=<IMP> | t=<VERDADERO> | t=<FALSO>
+    | t=<NUMERO_DECIMAL> | t=<NUMERO_ENTERO> | t=<CADENA> | t=<CARACTER>
+    | t=<STRING_NO_CERRADA> | t=<CARACTER_INVALIDO> | t=<ERROR_LEXICO>
+    | t=<ASIG_INC> | t=<ASIG_DEC> | t=<ASIGNACION> | t=<POTENCIA> | t=<RAIZ> | t=<INC> | t=<DEC_OP>
+    | t=<MAYOR_IGUAL> | t=<MENOR_IGUAL> | t=<DIFERENTE> | t=<SUMA> | t=<RESTA> | t=<MULT> | t=<DIV> | t=<MODULO>
+    | t=<IGUAL> | t=<MAYOR_QUE> | t=<MENOR_QUE> | t=<AND> | t=<OR> | t=<NOT>
+    | t=<APERTURA_PAREN> | t=<CIERRE_PAREN> | t=<APERTURA_BLOQUE> | t=<CIERRE_BLOQUE>
+    | t=<APERTURA_CORCHETE> | t=<CIERRE_CORCHETE> | t=<FIN_INSTRUCCION> | t=<SEPARADOR> | t=<DOS_PUNTOS>
+    | t=<IDENTIFICADOR>
+  )
+  { return t; }
+}

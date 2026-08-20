@@ -1,0 +1,8 @@
+RET 1;
+
+FUN contexto() {
+    SINO;
+    CUANDO 1: IMP "fuera de evaluar";
+    PRED: IMP "predeterminado fuera de evaluar";
+    RET 0;
+}
