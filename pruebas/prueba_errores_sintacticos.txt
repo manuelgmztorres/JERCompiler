@@ -1,0 +1,38 @@
+# Diagnosticos sintacticos especificos: cada caso reporta un mensaje propio,
+# no el generico "token inesperado".
+
+# --- Palabras reservadas de EVALUAR usadas fuera de contexto ---
+RET 1;
+
+FUN fueraDeContexto() {
+    SINO;
+    CUANDO 1: IMP "fuera de EVALUAR";
+    PRED: IMP "fuera de EVALUAR";
+    RET 0;
+}
+
+# --- Instrucciones de E/S y control incompletas ---
+FUN instruccionesIncompletas() {
+    IMP ;
+    OBT ;
+    RET ;
+}
+
+# --- Cabeceras de control de flujo vacias ---
+FUN cabecerasVacias() {
+    SI { IMP "A"; }
+    MIENTRAS { IMP "B"; }
+    REPETIR { IMP "C"; }
+}
+
+# --- Asignaciones y operadores incompletos ---
+FUN operadoresIncompletos() {
+    ENT x -> ;
+    ENT y -> 0;
+    y +-> ;
+    ENT a -> 10 + ;
+    ENT b -> 10 + * 2;
+}
+
+# --- Elemento faltante detectado por las reglas generales de respaldo ---
+ENT numero -> ,0;

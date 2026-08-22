@@ -1,0 +1,33 @@
+# Prueba del modo panico: cada bloque tiene UN error real. El codigo valido
+# que lo rodea no debe generar ruido adicional por efecto cascada.
+
+# Bloque SI sin llave de apertura: las 3 sentencias siguientes son validas.
+FUN sinLlaveDeApertura() {
+    ENT x -> 1;
+    SI x > 0
+        IMP "uno";
+        IMP "dos";
+        IMP "tres";
+}
+
+# Basura lexica consecutiva a nivel global: un solo error, no cuatro.
+$ $ $ $
+
+# Funcion con firma rota (coma sobrante) pero cuerpo valido.
+FUN firmaRota(ENT a, ) {
+    ENT y -> 5;
+    RET y;
+}
+
+# Dos errores reales en la misma linea: ambos deben reportarse.
+ENT a -> ; DEC b -> ;
+
+# Arreglo con indice sin cerrar.
+ENT datos[3 -> [1, 2];
+
+# Bloque MIENTRAS sin llave de cierre al final del archivo.
+FUN sinLlaveDeCierre() {
+    ENT i -> 0;
+    MIENTRAS i < 3 {
+        i +-> 1;
+}

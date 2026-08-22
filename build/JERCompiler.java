@@ -24,11 +24,15 @@ public class JERCompiler implements JERCompilerConstants {
   void recuperarGlobal() {
     Token t = getToken(1);
     if (t.kind == EOF) return;
+    // El primer token también debe pasar por el guard de '{': si se descarta a ciegas aquí,
+    // Bloque() nunca ve esa llave y la '}' que la cierra se fuga como token suelto más adelante.
+    if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
     getNextToken();
     do {
       t = getToken(1);
       if (t.kind == EOF || t.kind == FUN || t.kind == CONST || t.kind == TIPO_ENT
           || t.kind == TIPO_DEC || t.kind == TIPO_CAD || t.kind == TIPO_CAR || t.kind == TIPO_BOO) return;
+      if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
       getNextToken();
       if (t.kind == FIN_INSTRUCCION) return;
     } while (true);
@@ -37,14 +41,29 @@ public class JERCompiler implements JERCompilerConstants {
   void recuperarSentencia() {
     Token t = getToken(1);
     if (t.kind == EOF || t.kind == CIERRE_BLOQUE) return;
+    if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
     getNextToken();
     do {
       t = getToken(1);
       if (t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
-      if (ManejadorErrores.esInicioDeSentencia(t.kind)) return;
+      if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      if (esSincronizacionDeSentencia(t)) return;
       getNextToken();
       if (t.kind == FIN_INSTRUCCION) return;
     } while (true);
+  }
+
+  /**
+   * Analiza un bloque '{ ... }' que quedó huérfano tras un error. Saltarlo token a token
+   * desbalancearía las llaves y haría que la '}' del bloque exterior se fugue al nivel global,
+   * contaminando todo lo que viene después.
+   */
+  void consumirBloqueSuelto() {
+    try {
+      Bloque();
+    } catch (ParseException e) {
+      reportarError(e);
+    }
   }
 
   void recuperarCabeceraBloque() {
@@ -52,8 +71,53 @@ public class JERCompiler implements JERCompilerConstants {
     do {
       t = getToken(1);
       if (t.kind == EOF || t.kind == APERTURA_BLOQUE || t.kind == CIERRE_BLOQUE || t.kind == FIN_INSTRUCCION
-          || ManejadorErrores.esInicioDeSentencia(t.kind)) return;
+          || esSincronizacionDeSentencia(t)) return;
       getNextToken();
+    } while (true);
+  }
+
+  /**
+   * Un IDENTIFICADOR sólo inicia una sentencia si le sigue un operador de asignación, '(', '[',
+   * '++' o '--'. Sin esta comprobación el parser se resincroniza sobre cualquier identificador
+   * suelto y vuelve a analizar basura, generando errores en cascada.
+   */
+  boolean esSincronizacionDeSentencia(Token t) {
+    if (t.kind == IDENTIFICADOR) {
+      int k = getToken(2).kind;
+      return k == ASIGNACION || k == ASIG_INC || k == ASIG_DEC
+          || k == APERTURA_PAREN || k == APERTURA_CORCHETE || k == INC || k == DEC_OP;
+    }
+    return ManejadorErrores.esInicioDeSentencia(t.kind);
+  }
+
+  /**
+   * Rescata el cuerpo completo de un bloque tras un error en su apertura o en su cierre:
+   * analiza todas las sentencias que encuentre en lugar de sólo la primera, evitando que el
+   * resto del cuerpo se desborde al nivel global.
+   *
+   * Si el bloque nunca llegó a abrirse (faltaba la '{'), la '}' que se encuentre pertenece al
+   * bloque exterior: hay que dejarla sin consumir para no desincronizar las llaves.
+   */
+  void recuperarCuerpoBloque(boolean abierto) {
+    do {
+      Token t = getToken(1);
+      if (t.kind == EOF || t.kind == SINO || t.kind == FUN) return;
+      if (t.kind == CIERRE_BLOQUE) {
+        if (abierto) getNextToken();
+        return;
+      }
+      if (t.kind == APERTURA_BLOQUE) {
+        consumirBloqueSuelto();
+      } else if (esSincronizacionDeSentencia(t)) {
+        try {
+          Sentencia();
+        } catch (ParseException e) {
+          reportarError(e);
+          recuperarSentencia();
+        }
+      } else {
+        getNextToken();
+      }
     } while (true);
   }
 
@@ -371,9 +435,10 @@ reportarError(e);
     }
 }
 
-  final public void Bloque() throws ParseException {
+  final public void Bloque() throws ParseException {boolean abierto = false;
     try {
       jj_consume_token(APERTURA_BLOQUE);
+abierto = true;
       label_4:
       while (true) {
         if (getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF) {
@@ -386,12 +451,7 @@ reportarError(e);
       jj_consume_token(CIERRE_BLOQUE);
     } catch (ParseException e) {
 reportarError(e);
-    if (getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF && getToken(1).kind != SINO) {
-      Sentencia();
-      if (getToken(1).kind == CIERRE_BLOQUE) {
-        getNextToken();
-      }
-    }
+    recuperarCuerpoBloque(abierto);
     }
 }
 
@@ -1490,40 +1550,9 @@ totalCadenas++;
     finally { jj_save(16, xla); }
   }
 
-  private boolean jj_3_5()
+  private boolean jj_3R_TipoDato_224_5_22()
  {
-    if (jj_scan_token(CONST)) return true;
-    return false;
-  }
-
-  private boolean jj_3_4()
- {
-    if (jj_3R_TipoDato_156_5_17()) return true;
-    if (jj_scan_token(IDENTIFICADOR)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_null_106_29_16()
- {
-    if (jj_3R_TipoDato_156_5_17()) return true;
-    if (jj_scan_token(IDENTIFICADOR)) return true;
-    return false;
-  }
-
-  private boolean jj_3_2()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_scan_token(14)) {
-    jj_scanpos = xsp;
-    if (jj_3R_null_106_29_16()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3_1()
- {
-    if (jj_scan_token(FUN)) return true;
+    if (jj_scan_token(TIPO_BOO)) return true;
     return false;
   }
 
@@ -1533,49 +1562,43 @@ totalCadenas++;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_160_5_22()
- {
-    if (jj_scan_token(TIPO_BOO)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_TipoDato_159_5_21()
+  private boolean jj_3R_TipoDato_223_5_21()
  {
     if (jj_scan_token(TIPO_CAR)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_158_5_20()
+  private boolean jj_3R_TipoDato_222_5_20()
  {
     if (jj_scan_token(TIPO_CAD)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_157_5_19()
+  private boolean jj_3R_TipoDato_221_5_19()
  {
     if (jj_scan_token(TIPO_DEC)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_156_5_18()
+  private boolean jj_3R_TipoDato_220_5_18()
  {
     if (jj_scan_token(TIPO_ENT)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_156_5_17()
+  private boolean jj_3R_TipoDato_220_5_17()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_TipoDato_156_5_18()) {
+    if (jj_3R_TipoDato_220_5_18()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_157_5_19()) {
+    if (jj_3R_TipoDato_221_5_19()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_158_5_20()) {
+    if (jj_3R_TipoDato_222_5_20()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_159_5_21()) {
+    if (jj_3R_TipoDato_223_5_21()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_160_5_22()) return true;
+    if (jj_3R_TipoDato_224_5_22()) return true;
     }
     }
     }
@@ -1653,6 +1676,41 @@ totalCadenas++;
   private boolean jj_3_6()
  {
     if (jj_scan_token(SI)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_null_170_29_16()
+ {
+    if (jj_3R_TipoDato_220_5_17()) return true;
+    return false;
+  }
+
+  private boolean jj_3_5()
+ {
+    if (jj_scan_token(CONST)) return true;
+    return false;
+  }
+
+  private boolean jj_3_4()
+ {
+    if (jj_3R_TipoDato_220_5_17()) return true;
+    return false;
+  }
+
+  private boolean jj_3_2()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_scan_token(14)) {
+    jj_scanpos = xsp;
+    if (jj_3R_null_170_29_16()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3_1()
+ {
+    if (jj_scan_token(FUN)) return true;
     return false;
   }
 

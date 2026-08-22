@@ -1,0 +1,74 @@
+# Errores por no conocer las reglas propias de JER: como se compara, como se
+# asigna, como se escriben las reservadas, y como se arma cada construccion.
+# Cada caso reporta un unico error.
+
+# --- '==' en lugar de '=' para comparar ---
+FUN comparacionDoble(ENT n) {
+    SI (n == 0) {
+        IMP "cero";
+    }
+}
+
+# --- '=' usado como asignacion en lugar de '->' ---
+FUN asignacionConIgual() {
+    ENT total = 5;
+}
+
+# --- palabra reservada de JER escrita en minusculas ---
+FUN palabraEnMinuscula(ENT x) {
+    si x > 0 {
+        IMP "positivo";
+    }
+}
+
+# --- funciones anidadas: FUN solo se declara a nivel global ---
+FUN externa() {
+    FUN interna() {
+        RET 1;
+    }
+    RET 0;
+}
+
+# --- OBT usado con un valor en vez de una variable ---
+FUN leerValor() {
+    OBT 5;
+}
+
+# --- CONST sin tipo de dato ---
+CONST version -> 5;
+
+# --- dos SINO para un mismo SI ---
+FUN dobleRama(ENT x) {
+    SI x > 0 {
+        RET 1;
+    } SINO {
+        RET 0;
+    } SINO {
+        RET -1;
+    }
+}
+
+# --- llamada a funcion sin parentesis ---
+FUN llamarSinParentesis() {
+    IMP suma 1, 2;
+}
+
+# --- coma sobrante al final de un arreglo ---
+ENT lista -> [1, 2, ];
+
+# --- coma sobrante al final de los argumentos de una llamada ---
+FUN llamarConComaFinal() {
+    IMP suma(1, 2, );
+}
+
+# --- parametro de funcion sin nombre ---
+FUN sinNombreDeParametro(ENT, ENT b) {
+    RET b;
+}
+
+# --- operador relacional repetido ---
+FUN condicionRota(ENT x) {
+    SI (x > > 0) {
+        RET 1;
+    }
+}

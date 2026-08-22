@@ -1,0 +1,91 @@
+# ==========================================
+# Programa valido que ejercita todos los componentes de JER.
+# Debe analizarse con 0 errores.
+# ==========================================
+
+# Tipos, constantes y arreglos/matrices multidimensionales.
+CONST DEC PI -> 3.14159;
+CONST CAD SALUDO -> "Bienvenido al sistema JER";
+CONST BOO MODO_DEBUG -> VERDADERO;
+
+ENT contador -> 0;
+DEC factor -> 1.5;
+CAD mensaje -> "Estado OK";
+CAR letra -> 'J';
+BOO activo -> FALSO;
+
+ENT vector[5] -> [10, 20, 30, 40, 50];
+DEC matriz[2][3] -> [[1.1, 1.2, 1.3], [2.1, 2.2, 2.3]];
+
+# Funcion recursiva: llamadas entre funciones, RET, condicion SI/SINO.
+FUN factorial(ENT n) {
+    SI (n <= 1) {
+        RET 1;
+    } SINO {
+        RET n * factorial(n - 1);
+    }
+}
+
+# Operadores aritmeticos completos: + - * / % ** //
+FUN calcular(DEC base, DEC exponente) {
+    DEC potencia -> base ** exponente;
+    DEC raiz -> base // 2.0;
+    DEC residuo -> base % 2.0;
+    RET (potencia + raiz - residuo) * 2.0 / factor;
+}
+
+# EVALUAR / CUANDO / PRED
+FUN evaluarNota(ENT nota) {
+    EVALUAR nota {
+        CUANDO 10:
+            IMP "Excelente";
+            contador++;
+        CUANDO 9:
+            IMP "Muy bien";
+            contador +-> 1;
+        PRED:
+            IMP "Necesita mejorar";
+            contador --> 1;
+    }
+}
+
+# MIENTRAS, REPETIR, SI/SINO anidado, operadores relacionales y logicos.
+FUN controlDeFlujo(ENT limite) {
+    ENT i -> 0;
+    MIENTRAS i < limite AND (activo = FALSO OR contador != 0) {
+        vector[i] -> vector[i] * 2;
+        i++;
+    }
+    REPETIR 3 {
+        IMP "Repeticion fija";
+    }
+    SI (limite >= 10 AND NOT limite = 100) {
+        matriz[0][1] -> factorial(4);
+        SI limite = 50 {
+            TERMINAR;
+        }
+    } SINO {
+        IMP "Fuera de rango";
+    }
+}
+
+# Entrada/salida y operadores de asignacion compuesta.
+FUN entradaSalida() {
+    ENT lectura -> 0;
+    OBT lectura;
+    lectura +-> 10;
+    lectura --> 2;
+    IMP SALUDO;
+    IMP lectura;
+}
+
+FUN principal() {
+    IMP SALUDO;
+    controlDeFlujo(5);
+    evaluarNota(9);
+    DEC resultado -> calcular(4.0, 3.0);
+    IMP resultado;
+    IMP factorial(6);
+    entradaSalida();
+    RET 0;
+}

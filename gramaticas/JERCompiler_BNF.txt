@@ -98,11 +98,27 @@ LÉXICO Y COMENTARIOS
 ESTRATEGIA DE RECUPERACIÓN DE ERRORES (MODO PÁNICO)
 ---------------------------------------------------
 
-1. Desacoplamiento Jerárquico: Errores en cabeceras de funciones o estructuras
-   (SI, MIENTRAS, EVALUAR) reportan el fallo y sincronizan con '{', permitiendo
-   analizar todas las sentencias internas del bloque.
-2. Sincronización por FIRST(Sentencia): Si una instrucción no tiene ';', el
-   recuperador se detiene al detectar el inicio de la siguiente sentencia
-   (ENT, DEC, SI, IMP, etc.), evitando que una línea rota devore las siguientes.
-3. Resiliencia de Bloques: Si falta la llave '{', se reporta el error y se
-   analiza la instrucción siguiente como cuerpo provisional.
+1. Desacoplamiento jerárquico: errores en cabeceras de funciones o estructuras
+   (SI, MIENTRAS, REPETIR, EVALUAR) reportan el fallo y sincronizan con '{',
+   permitiendo analizar todas las sentencias internas del bloque.
+2. Sincronización por FIRST(Sentencia) refinada: el recuperador se detiene al
+   detectar el inicio de la siguiente sentencia (ENT, DEC, SI, IMP, etc.). Un
+   IDENTIFICADOR sólo cuenta como inicio si le sigue un operador de asignación
+   ('->', '+->', '-->'), '(', '[', '++' o '--'; de lo contrario se trataría
+   cualquier identificador suelto como sincronización y se reanalizaría basura,
+   generando errores en cascada.
+3. Resiliencia de bloques: si falta la llave '{' de un Bloque, el error se
+   reporta y se analizan TODAS las sentencias del cuerpo huérfano (no sólo la
+   primera), hasta encontrar '}', SINO, FUN o EOF. El recuperador recuerda si
+   la llave de apertura llegó a consumirse: si nunca se abrió, la '}' que
+   encuentra pertenece al bloque exterior y se deja sin consumir.
+4. Protección de llaves durante la sincronización global o de sentencia: si al
+   descartar tokens se encuentra una '{' suelta, no se salta token por token
+   (eso desbalancearía las llaves); en su lugar se analiza como un Bloque()
+   completo, y sus propios errores internos se reportan por separado.
+5. Supresión de diagnósticos derivados: los mensajes genéricos ("token
+   inesperado", coma o cierre fuera de lugar) se suprimen si aparecen a menos
+   de dos tokens del último error ya reportado, evitando que un solo error real
+   produzca varios diagnósticos redundantes. Los mensajes específicos (tipo de
+   estructura, instrucción incompleta, palabra reservada mal escrita, etc.)
+   siempre se reportan, sin importar la distancia.

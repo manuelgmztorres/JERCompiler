@@ -1,0 +1,14 @@
+# Errores puramente lexicos: cada caso reporta un unico error [ERROR LEXICO].
+# El comentario de bloque sin cerrar va al final: consume todo lo que le sigue.
+
+FUN cadenaSinCerrar() {
+    IMP "cadena sin cerrar
+}
+
+FUN caracterInvalido() {
+    CAR letra -> 'ab';
+}
+
+ENT precio -> 100$;
+
+/** Comentario de bloque que ya no se cierra
