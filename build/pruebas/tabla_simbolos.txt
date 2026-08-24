@@ -1,8 +1,0 @@
-TABLA DE SÍMBOLOS - JERCompiler
-Archivo: ..\pruebas\prueba_errores_robustos.txt
-Identificador        | Tipo       | Valor/expresión
----------------------+------------+------------------------------
-limite               | ENT        | -
-limite               | ENT        | -
-posterior            | ENT        | 42
-precio               | ENT        | 100

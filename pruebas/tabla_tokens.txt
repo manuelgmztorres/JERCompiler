@@ -1,6 +1,6 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: C:\Users\manue\Documents\Escuela\7mo Semestre\Automatas\Compilador_JER\pruebas\prueba_valida.txt
-No.   | Lexema               | Token                        | Línea  | Columna
+Archivo: pruebas\prueba_nueva.txt
+No.   | Lexema               | Token                        | Linea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | CONST                | CONST                        | 7      | 1
 2     | DEC                  | DEC                          | 7      | 7
