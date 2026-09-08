@@ -1,0 +1,12 @@
+FUN suma(ENT num1, ENT num2){
+	ENT suma -> num1 + num2;
+	RET suma;
+}
+
+FUN obtSuma(){
+	ENT num1 -> 0;
+	ENT num2 -> 0;
+	OBT num1;
+	OBT num2;
+	IMP(suma(num1,num2));
+}

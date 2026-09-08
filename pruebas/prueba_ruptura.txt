@@ -1,0 +1,2 @@
+ENT pruebaNumRoto -> "Hola";
+CAR pruebaCarRoto -> 723;

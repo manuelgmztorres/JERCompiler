@@ -1,0 +1,13 @@
+ENT matriz[2][2] -> [[0,0],[0,0]];
+
+FUN llenarMatriz(ENT matriz){
+	ENT fila -> 0;
+	ENT columna -> 0;
+	REPETIR 4{
+		matriz[fila][columna] -> 2;
+		fila++;
+		columna++;
+	}
+	RET 0;
+}
+		
