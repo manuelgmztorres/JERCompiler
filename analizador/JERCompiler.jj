@@ -23,35 +23,25 @@ public class JERCompiler {
   }
 
   void recuperarGlobal() {
-    Token t = getToken(1);
-    if (t.kind == EOF) return;
-    // El primer token también debe pasar por el guard de '{': si se descarta a ciegas aquí,
-    // Bloque() nunca ve esa llave y la '}' que la cierra se fuga como token suelto más adelante.
-    if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
-    getNextToken();
     do {
-      t = getToken(1);
-      if (t.kind == EOF || t.kind == FUN || t.kind == CONST || t.kind == TIPO_ENT
-          || t.kind == TIPO_DEC || t.kind == TIPO_CAD || t.kind == TIPO_CAR || t.kind == TIPO_BOO) return;
-      if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      Token t = getToken(1);
+      if(t.kind == EOF || t.kind == FUN || t.kind == CONST || t.kind == TIPO_ENT
+        || t.kind == TIPO_DEC || t.kind == TIPO_CAD || t.kind == TIPO_CAR || t.kind == TIPO_BOO) return;
+      if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
       getNextToken();
-      if (t.kind == FIN_INSTRUCCION) return;
-    } while (true);
+      if(t.kind == FIN_INSTRUCCION) return;
+    } while(true);
   }
 
   void recuperarSentencia() {
-    Token t = getToken(1);
-    if (t.kind == EOF || t.kind == CIERRE_BLOQUE) return;
-    if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
-    getNextToken();
     do {
-      t = getToken(1);
-      if (t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
-      if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
-      if (esSincronizacionDeSentencia(t)) return;
+      Token t = getToken(1);
+      if(t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
+      if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      if(esSincronizacionDeSentencia(t)) return;
       getNextToken();
-      if (t.kind == FIN_INSTRUCCION) return;
-    } while (true);
+      if(t.kind == FIN_INSTRUCCION) return;
+    }while(true);
   }
 
   /**
@@ -104,7 +94,9 @@ public class JERCompiler {
       Token t = getToken(1);
       if (t.kind == EOF || t.kind == SINO || t.kind == FUN) return;
       if (t.kind == CIERRE_BLOQUE) {
-        if (abierto) getNextToken();
+        if (abierto) { getNextToken(); return;};
+        int siguiente = getToken(2).kind;
+        if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED) getNextToken();
         return;
       }
       if (t.kind == APERTURA_BLOQUE) {

@@ -22,35 +22,25 @@ public class JERCompiler implements JERCompilerConstants {
   }
 
   void recuperarGlobal() {
-    Token t = getToken(1);
-    if (t.kind == EOF) return;
-    // El primer token también debe pasar por el guard de '{': si se descarta a ciegas aquí,
-    // Bloque() nunca ve esa llave y la '}' que la cierra se fuga como token suelto más adelante.
-    if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
-    getNextToken();
     do {
-      t = getToken(1);
-      if (t.kind == EOF || t.kind == FUN || t.kind == CONST || t.kind == TIPO_ENT
-          || t.kind == TIPO_DEC || t.kind == TIPO_CAD || t.kind == TIPO_CAR || t.kind == TIPO_BOO) return;
-      if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      Token t = getToken(1);
+      if(t.kind == EOF || t.kind == FUN || t.kind == CONST || t.kind == TIPO_ENT
+        || t.kind == TIPO_DEC || t.kind == TIPO_CAD || t.kind == TIPO_CAR || t.kind == TIPO_BOO) return;
+      if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
       getNextToken();
-      if (t.kind == FIN_INSTRUCCION) return;
-    } while (true);
+      if(t.kind == FIN_INSTRUCCION) return;
+    } while(true);
   }
 
   void recuperarSentencia() {
-    Token t = getToken(1);
-    if (t.kind == EOF || t.kind == CIERRE_BLOQUE) return;
-    if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
-    getNextToken();
     do {
-      t = getToken(1);
-      if (t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
-      if (t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
-      if (esSincronizacionDeSentencia(t)) return;
+      Token t = getToken(1);
+      if(t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
+      if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      if(esSincronizacionDeSentencia(t)) return;
       getNextToken();
-      if (t.kind == FIN_INSTRUCCION) return;
-    } while (true);
+      if(t.kind == FIN_INSTRUCCION) return;
+    }while(true);
   }
 
   /**
@@ -103,7 +93,9 @@ public class JERCompiler implements JERCompilerConstants {
       Token t = getToken(1);
       if (t.kind == EOF || t.kind == SINO || t.kind == FUN) return;
       if (t.kind == CIERRE_BLOQUE) {
-        if (abierto) getNextToken();
+        if (abierto) { getNextToken(); return;};
+        int siguiente = getToken(2).kind;
+        if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED) getNextToken();
         return;
       }
       if (t.kind == APERTURA_BLOQUE) {
@@ -1550,7 +1542,24 @@ totalCadenas++;
     finally { jj_save(16, xla); }
   }
 
-  private boolean jj_3R_TipoDato_224_5_22()
+  private boolean jj_3_2()
+ {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_scan_token(14)) {
+    jj_scanpos = xsp;
+    if (jj_3R_null_162_29_16()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3_1()
+ {
+    if (jj_scan_token(FUN)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_TipoDato_216_5_22()
  {
     if (jj_scan_token(TIPO_BOO)) return true;
     return false;
@@ -1562,43 +1571,43 @@ totalCadenas++;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_223_5_21()
+  private boolean jj_3R_TipoDato_215_5_21()
  {
     if (jj_scan_token(TIPO_CAR)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_222_5_20()
+  private boolean jj_3R_TipoDato_214_5_20()
  {
     if (jj_scan_token(TIPO_CAD)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_221_5_19()
+  private boolean jj_3R_TipoDato_213_5_19()
  {
     if (jj_scan_token(TIPO_DEC)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_220_5_18()
+  private boolean jj_3R_TipoDato_212_5_18()
  {
     if (jj_scan_token(TIPO_ENT)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_220_5_17()
+  private boolean jj_3R_TipoDato_212_5_17()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_TipoDato_220_5_18()) {
+    if (jj_3R_TipoDato_212_5_18()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_221_5_19()) {
+    if (jj_3R_TipoDato_213_5_19()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_222_5_20()) {
+    if (jj_3R_TipoDato_214_5_20()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_223_5_21()) {
+    if (jj_3R_TipoDato_215_5_21()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_224_5_22()) return true;
+    if (jj_3R_TipoDato_216_5_22()) return true;
     }
     }
     }
@@ -1679,9 +1688,9 @@ totalCadenas++;
     return false;
   }
 
-  private boolean jj_3R_null_170_29_16()
+  private boolean jj_3R_null_162_29_16()
  {
-    if (jj_3R_TipoDato_220_5_17()) return true;
+    if (jj_3R_TipoDato_212_5_17()) return true;
     return false;
   }
 
@@ -1693,24 +1702,7 @@ totalCadenas++;
 
   private boolean jj_3_4()
  {
-    if (jj_3R_TipoDato_220_5_17()) return true;
-    return false;
-  }
-
-  private boolean jj_3_2()
- {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_scan_token(14)) {
-    jj_scanpos = xsp;
-    if (jj_3R_null_170_29_16()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3_1()
- {
-    if (jj_scan_token(FUN)) return true;
+    if (jj_3R_TipoDato_212_5_17()) return true;
     return false;
   }
 

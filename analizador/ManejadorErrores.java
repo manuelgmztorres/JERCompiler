@@ -150,7 +150,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
         "caracter no reconocido '" + token.image + "'.", null, true);
     if (token.kind == STRING_NO_CERRADA) return alta(token, "cadena sin cerrar; falta '\"'.", "Se esperaba '\"' para cerrar la cadena.");
     if (token.kind == CARACTER_INVALIDO) return alta(token, "literal de caracter invalido.", "Se esperaba un unico caracter entre comillas simples.");
-    if (token.kind == EOF) return alta(token, "fin de archivo inesperado; falta cerrar una instruccion o bloque.", sugerenciaAutomatica(error));
+    if (token.kind == EOF) return faltante(anterior, token, "fin de archivo inesperado; falta cerrar una instruccion o bloque.", sugerenciaAutomatica(error));
 
     // === CAPA 2: Contexto estructural ===
     if (token.kind == RET) return alta(token, "RET solo puede usarse dentro de una funcion.", null);
@@ -238,23 +238,23 @@ public final class ManejadorErrores implements JERCompilerConstants {
     boolean puntoComa = espera(error, FIN_INSTRUCCION);
     boolean asignacion = espera(error, ASIGNACION) || espera(error, ASIG_INC) || espera(error, ASIG_DEC);
     boolean coma = espera(error, SEPARADOR);
-    if (puntoComa && esInicioDeSentencia(token.kind)) return alta(token, "falta ';' al final de la instruccion anterior.", "Se esperaba ';'.");
-    if (asignacion) return alta(token, "falta el operador de asignacion '->'.", "Se esperaba '->'.");
+    if (puntoComa && esInicioDeSentencia(token.kind)) return faltante(anterior, token, "falta ';' al final de la instruccion anterior.", "Se esperaba ';'.");
+    if (asignacion) return faltante(anterior, token, "falta el operador de asignacion '->'.", "Se esperaba '->'.");
     if (token.kind == CIERRE_CORCHETE && esperaExpresion(error))
       return alta(token, "falta una expresion dentro de la dimension, el indice o el literal de arreglo.", "Se esperaba un valor o expresion antes de ']'.");
     if (token.kind == IDENTIFICADOR && esperaTipoDato(error))
       return alta(token, "parametro sin tipo de dato; se esperaba ENT, DEC, CAD, CAR o BOO.", "Se esperaba un tipo antes de '" + token.image + "'.");
-    if (espera(error, IDENTIFICADOR)) return alta(token, "falta un identificador.", "Se esperaba un nombre de variable o funcion.");
-    if (esperaOperadorRelacional(error)) return alta(token, "condicion incompleta; falta un operador relacional (=, !=, <, <=, > o >=).", "Se esperaba un operador relacional.");
-    if (espera(error, CIERRE_CORCHETE)) return alta(token, "falta ']' para cerrar un indice, dimension o literal de arreglo.", "Se esperaba ']'.");
-    if (espera(error, CIERRE_PAREN)) return alta(token, "falta ')' para cerrar la expresion o llamada.", "Se esperaba ')'.");
-    if (espera(error, CIERRE_BLOQUE)) return alta(token, "falta '}' para cerrar el bloque.", "Se esperaba '}'.");
-    if (espera(error, APERTURA_BLOQUE)) return alta(token, "falta '{' para iniciar el bloque.", "Se esperaba '{'.");
-    if (espera(error, DOS_PUNTOS)) return alta(token, "falta ':' despues de CUANDO o PRED.", "Se esperaba ':'.");
-    if (espera(error, CUANDO)) return alta(token, "EVALUAR requiere al menos un caso CUANDO.", "Se esperaba 'CUANDO'.");
+    if (espera(error, IDENTIFICADOR)) return faltante(anterior, token, "falta un identificador.", "Se esperaba un nombre de variable o funcion.");
+    if (esperaOperadorRelacional(error)) return faltante(anterior, token, "condicion incompleta; falta un operador relacional (=, !=, <, <=, > o >=).", "Se esperaba un operador relacional.");
+    if (espera(error, CIERRE_CORCHETE)) return faltante(anterior, token, "falta ']' para cerrar un indice, dimension o literal de arreglo.", "Se esperaba ']'.");
+    if (espera(error, CIERRE_PAREN)) return faltante(anterior, token, "falta ')' para cerrar la expresion o llamada.", "Se esperaba ')'.");
+    if (espera(error, CIERRE_BLOQUE)) return faltante(anterior, token, "falta '}' para cerrar el bloque.", "Se esperaba '}'.");
+    if (espera(error, APERTURA_BLOQUE)) return faltante(anterior, token, "falta '{' para iniciar el bloque.", "Se esperaba '{'.");
+    if (espera(error, DOS_PUNTOS)) return faltante(anterior, token, "falta ':' despues de CUANDO o PRED.", "Se esperaba ':'.");
+    if (espera(error, CUANDO)) return faltante(anterior, token, "EVALUAR requiere al menos un caso CUANDO.", "Se esperaba 'CUANDO'.");
     if (coma && token.kind != CIERRE_PAREN && token.kind != CIERRE_CORCHETE)
-      return alta(token, "falta ',' entre elementos o argumentos.", "Se esperaba ','.");
-    if (puntoComa) return alta(token, "falta ';' al final de la instruccion.", "Se esperaba ';'.");
+      return faltante(anterior, token, "falta ',' entre elementos o argumentos.", "Se esperaba ','.");
+    if (puntoComa) return faltante(anterior, token, "falta ';' al final de la instruccion.", "Se esperaba ';'.");
     if (token.kind == SEPARADOR) return baja(token, "coma fuera de lugar o elemento faltante.", "Se esperaba un elemento antes de ','.");
     if (token.kind == CIERRE_CORCHETE) return baja(token, "']' inesperado.", null);
     if (token.kind == CIERRE_PAREN) return baja(token, "')' inesperado.", null);
@@ -331,6 +331,18 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
   private static ErrorJER baja(Token token, String detalle, String sugerencia) {
     return new ErrorJER("ERROR SINTACTICO", token.beginLine, token.beginColumn, detalle, sugerencia, false);
+  }
+  /**
+   * Para diagnosticos de algo AUSENTE ("falta ..."): el token donde JavaCC detecto la falla
+   * suele ser el primer token de la sentencia siguiente, que puede caer varias lineas mas
+   * abajo del lugar real donde faltaba el simbolo. Se reporta sobre el ultimo token valido
+   * (anterior) en su lugar, que es donde el simbolo ausente debia haber ido. Toda regla nueva
+   * que agregue un mensaje "falta X" debe usar este metodo, no alta(), para no reintroducir
+   * el desfase de linea/columna.
+   */
+  private static ErrorJER faltante(Token anterior, Token token, String detalle, String sugerencia) {
+    Token referencia = anterior != null ? anterior : token;
+    return new ErrorJER("ERROR SINTACTICO", referencia.beginLine, referencia.beginColumn, detalle, sugerencia, true);
   }
 
   /**

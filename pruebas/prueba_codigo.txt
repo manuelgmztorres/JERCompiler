@@ -13,9 +13,9 @@ FUN suma(){
 	IMP(num1+num2);
 }
 
-FUN capturaBandera(BOO bandera){
-	SI(bandera=VERDADERO)
-		IMP("La bandera no ha sido tomado");
+FUN capturaBandera(BOO bandera{
+	SI(bandera=VERDADERO){
+		IMP(La bandera no ha sido tomado");
 	}SINO{
 		IMP("La bandera ha sido tomada");
 	}
@@ -25,7 +25,7 @@ FUN pruebaVector(ENT vector){
 	ENT contador -> 0;
 	REPETIR 5{
 		IMP(vector[contador]);
-		contador++;
+		contador+;
 	}
 }
 
