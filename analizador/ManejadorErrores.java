@@ -17,7 +17,30 @@ import java.util.*;
  * esto y se elimino; ver el comentario en diagnosticar().
  */
 public final class ManejadorErrores implements JERCompilerConstants {
-  private static final String ARCHIVO_TABLA = "pruebas" + File.separator + "tabla_tokens.txt";
+  private static final String ARCHIVO_TABLA = resolverRutaTabla();
+
+  /**
+   * Calcula la ruta de tabla_tokens.txt de forma independiente del directorio de trabajo
+   * (cwd) desde el que se invoque "java". En vez de usar una ruta relativa "pruebas/..."
+   * (que Java resuelve contra el cwd del proceso, no contra la ubicacion del proyecto),
+   * se ubica el directorio que contiene las clases compiladas (normalmente "build") y se
+   * asume que "pruebas" es una carpeta hermana de ese directorio, en la raiz del proyecto.
+   * Si por algun motivo no se puede determinar (por ejemplo, empaquetado en un .jar), se
+   * hace fallback a la ruta relativa original.
+   */
+  private static String resolverRutaTabla() {
+    try {
+      File origenClases = new File(
+          ManejadorErrores.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+      File raizProyecto = origenClases.isDirectory() ? origenClases.getParentFile() : null;
+      if (raizProyecto != null) {
+        return new File(raizProyecto, "pruebas" + File.separator + "tabla_tokens.txt").getPath();
+      }
+    } catch (Exception ignorada) {
+      // Fallback abajo.
+    }
+    return "pruebas" + File.separator + "tabla_tokens.txt";
+  }
 
   /** Maximo de errores reportados antes de detener el diagnostico. */
   private static final int MAX_ERRORES = 100;
