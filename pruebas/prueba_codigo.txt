@@ -23,7 +23,7 @@ FUN capturaBandera(BOO bandera{
 
 FUN pruebaVector(ENT vector){
 	ENT contador -> 0;
-	REPETIR 5{
+	REPETIR (ENT j -> 0; j < 5; j +-> 1){
 		IMP(vector[contador]);
 		contador+;
 	}

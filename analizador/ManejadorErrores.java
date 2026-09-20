@@ -2,7 +2,20 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** Ejecucion, diagnosticos y tabla de tokens del analizador JER. */
+/**
+ * Ejecucion, diagnosticos y tabla de tokens del analizador JER.
+ *
+ * Principio de diseno para cualquier reporte de error, sintactico o (a futuro) semantico:
+ * preferir SIEMPRE un reporte directo con contexto explicito (la gramatica o el chequeo que
+ * detecta el problema ya sabe exactamente que paso — ver reportarRetornoFueraFuncion(),
+ * reportarColaHacerIncompleta(), reportarCabeceraRepetirIncompleta(), reportarErrorSemantico())
+ * en vez de intentar reconstruirlo adivinando desde una excepcion generica. diagnosticar()
+ * (el diagnostico por ParseException) es el ultimo recurso, para cuando no hay un chequeo
+ * especifico escrito; toda regla ahi que reclame "el token X esta mal ubicado" debe corroborarlo
+ * contra expectedTokenSequences (via espera()) antes de afirmarlo — nunca disparar solo por
+ * identidad de token. La CAPA 2 original (RET/SINO/CUANDO/PRED por identidad de token) violaba
+ * esto y se elimino; ver el comentario en diagnosticar().
+ */
 public final class ManejadorErrores implements JERCompilerConstants {
   private static final String ARCHIVO_TABLA = "pruebas" + File.separator + "tabla_tokens.txt";
 
@@ -20,7 +33,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
 
   /** Palabras reservadas de JER, para detectarlas escritas en minusculas. */
   private static final Set<String> RESERVADAS = new HashSet<String>(Arrays.asList(
-    "ENT", "DEC", "CAD", "CAR", "BOO", "CONST", "SI", "SINO", "MIENTRAS", "REPETIR",
+    "ENT", "DEC", "CAD", "CAR", "BOO", "CONST", "SI", "SINO", "MIENTRAS", "REPETIR", "HACER",
     "EVALUAR", "CUANDO", "PRED", "TERMINAR", "FUN", "RET", "OBT", "IMP",
     "VERDADERO", "FALSO", "AND", "OR", "NOT"));
 
@@ -124,6 +137,110 @@ public final class ManejadorErrores implements JERCompilerConstants {
     registrar(baja(token, "token inesperado '" + token.image + "' en " + contexto + ".", null));
   }
 
+  /**
+   * Punto de entrada para la futura fase semantica: como reportarRetornoFueraFuncion() o
+   * reportarCabeceraRepetirIncompleta(), un reporte SIEMPRE debe venir con contexto explicito
+   * (linea/columna reales del nodo/token involucrado, detalle concreto) — nunca reconstruido
+   * adivinando desde una excepcion generica. Sin usos todavia: no hay AST ni tabla de simbolos
+   * aun, pero el patron a seguir cuando existan es este.
+   */
+  public static void reportarErrorSemantico(int linea, int columna, String detalle, String sugerencia) {
+    registrar(new ErrorJER("ERROR SEMANTICO", linea, columna, detalle, sugerencia, true));
+  }
+
+  public static void reportarBloqueFaltanteHacer(Token hacer, Token siguiente) {
+    registrar(faltante(hacer, siguiente,
+      "la estructura HACER requiere un bloque '{' inmediatamente despues de HACER.",
+      "Se esperaba '{' despues de HACER."));
+  }
+
+  /**
+   * Diagnostico dedicado para la cola 'MIENTRAS ( condicion ) ;' de HACER...MIENTRAS.
+   * Se distingue por etapa (no por patron de token anterior/actual) porque el hueco
+   * "MIENTRAS (" es indistinguible por adyacencia de tokens del inicio de una
+   * EstructuraMientras corriente; JERCompiler.jj ya sabe en que pieza fallo.
+   */
+  public static void reportarColaHacerIncompleta(int etapa, ParseException error) {
+    Token token = error.currentToken != null && error.currentToken.next != null ? error.currentToken.next : error.currentToken;
+    Token anterior = error.currentToken;
+    switch (etapa) {
+      case 0:
+        registrar(faltante(anterior, token, "la estructura HACER...MIENTRAS requiere 'MIENTRAS' seguido de la condicion entre parentesis.", "Se esperaba 'MIENTRAS (condicion);'."));
+        break;
+      case 1:
+        registrar(faltante(anterior, token, "la condicion de HACER...MIENTRAS debe ir entre parentesis.", "Se esperaba '(' despues de MIENTRAS."));
+        break;
+      case 2:
+        registrar(faltante(anterior, token, "falta la condicion de HACER...MIENTRAS.", "Se esperaba una condicion antes de ')'."));
+        break;
+      case 3:
+        registrar(faltante(anterior, token, "falta ')' para cerrar la condicion de HACER...MIENTRAS.", "Se esperaba ')'."));
+        break;
+      default:
+        registrar(faltante(anterior, token, "falta ';' al final de la instruccion HACER...MIENTRAS.", "Se esperaba ';'."));
+        break;
+    }
+  }
+
+  /**
+   * Diagnostico dedicado para la cabecera '( declaracion ; condicion ; paso )' de REPETIR.
+   * Igual que reportarColaHacerIncompleta(), se distingue por etapa porque la gramatica ya
+   * sabe exactamente que pieza de la cabecera fallo.
+   */
+  public static void reportarCabeceraRepetirIncompleta(int etapa, ParseException error) {
+    Token token = error.currentToken != null && error.currentToken.next != null ? error.currentToken.next : error.currentToken;
+    Token anterior = error.currentToken;
+    switch (etapa) {
+      case 0:
+        registrar(faltante(anterior, token, "la estructura REPETIR requiere una cabecera '(declaracion; condicion; paso)'.", "Se esperaba '(' despues de REPETIR."));
+        break;
+      case 1:
+        registrar(faltante(anterior, token, "falta la declaracion de la variable de control de REPETIR.", "Se esperaba una declaracion, por ejemplo 'ENT i -> 0'."));
+        break;
+      case 2:
+        registrar(faltante(anterior, token, "falta ';' despues de la declaracion de la variable de control de REPETIR.", "Se esperaba ';'."));
+        break;
+      case 3:
+        registrar(faltante(anterior, token, "falta la condicion de REPETIR.", "Se esperaba una condicion, por ejemplo 'i < 10'."));
+        break;
+      case 4:
+        registrar(faltante(anterior, token, "falta ';' despues de la condicion de REPETIR.", "Se esperaba ';'."));
+        break;
+      case 5:
+        registrar(faltante(anterior, token, "falta el paso de REPETIR.", "Se esperaba un incremento, por ejemplo 'i +-> 1' o 'i++'."));
+        break;
+      default:
+        registrar(faltante(anterior, token, "falta ')' para cerrar la cabecera de REPETIR.", "Se esperaba ')'."));
+        break;
+    }
+  }
+
+  /**
+   * Cuenta el desbalance de '{'/'}' entre el token dado (el propio FUN de una funcion, exclusive)
+   * y el siguiente FUN de nivel global (o EOF). Es una pregunta que SI tiene respuesta cierta
+   * (a diferencia de "cual '{' especifica le falta su '}'", que es ambiguo cuando el conteo no
+   * cuadra) — sirve para decidir si vale la pena seguir intentando recuperar sentencia por
+   * sentencia, o si es mas honesto rendirse con un solo diagnostico.
+   */
+  public static boolean hayDesbalanceDeLlavesEnFuncion(Token inicioFuncion) {
+    int indiceInicio = indiceDe(inicioFuncion.beginLine, inicioFuncion.beginColumn);
+    if (indiceInicio < 0) return false;
+    int balance = 0;
+    for (int i = indiceInicio + 1; i < tabla.size(); i++) {
+      int kind = tabla.get(i).kind;
+      if (kind == FUN) break;
+      if (kind == APERTURA_BLOQUE) balance++;
+      else if (kind == CIERRE_BLOQUE) balance--;
+    }
+    return balance != 0;
+  }
+
+  public static void reportarDesbalanceDeLlaves(Token referencia) {
+    registrar(new ErrorJER("ERROR SINTACTICO", referencia.beginLine, referencia.beginColumn,
+      "la cantidad de '{' y '}' en esta funcion no cuadra; revisa que cada bloque tenga su '}' de cierre.",
+      "No se puede determinar con certeza cual bloque especifico quedo sin cerrar.", true));
+  }
+
   /** Mensaje formateado de un ParseException. Se conserva por compatibilidad. */
   public static String obtenerMensajeError(ParseException error) {
     ErrorJER diagnostico = diagnosticar(error);
@@ -152,11 +269,13 @@ public final class ManejadorErrores implements JERCompilerConstants {
     if (token.kind == CARACTER_INVALIDO) return alta(token, "literal de caracter invalido.", "Se esperaba un unico caracter entre comillas simples.");
     if (token.kind == EOF) return faltante(anterior, token, "fin de archivo inesperado; falta cerrar una instruccion o bloque.", sugerenciaAutomatica(error));
 
-    // === CAPA 2: Contexto estructural ===
-    if (token.kind == RET) return alta(token, "RET solo puede usarse dentro de una funcion.", null);
-    if (token.kind == SINO) return alta(token, "SINO sin un SI previo.", null);
-    if (token.kind == CUANDO) return alta(token, "CUANDO solo puede usarse dentro de EVALUAR.", null);
-    if (token.kind == PRED) return alta(token, "PRED solo puede usarse dentro de EVALUAR.", null);
+    // CAPA 2 (contexto estructural de RET/SINO/CUANDO/PRED) se elimino: esos 4 casos ya se
+    // reportan por llamada directa desde la gramatica (reportarRetornoFueraFuncion() /
+    // reportarTokenFueraDeContexto(), ver SentenciaInvalida()/ElementoGlobalInvalido()/
+    // SentenciaRetorno() en JERCompiler.jj) ANTES de que puedan generar una ParseException real.
+    // Si uno de estos tokens llega aqui, es victima colateral de otra excepcion (p. ej. un bloque
+    // sin cerrar) — CAPA 4 (expectedTokenSequences) ya lo diagnostica correctamente sin adivinar
+    // por identidad de token.
 
     // === CAPA 2.5: Palabra reservada mal escrita al inicio de la sentencia ===
     // Va antes de la Capa 3 porque una reservada en minusculas (p. ej. 'si x > 0') tambien
@@ -177,13 +296,11 @@ public final class ManejadorErrores implements JERCompilerConstants {
         return alta(token, "la instruccion TERMINAR no recibe argumentos; use unicamente 'TERMINAR;'.", "Se esperaba ';'.");
 
       // --- 3b: Cabeceras de control de flujo vacias ---
-      if (anterior.kind == SI && token.kind == APERTURA_BLOQUE)
+      if (anterior.kind == SI && (token.kind == APERTURA_BLOQUE || esInicioDeSentencia(token.kind)))
         return alta(token, "la estructura SI requiere una condicion antes del bloque '{'.", "Se esperaba una condicion, por ejemplo 'SI x > 0 {'.");
-      if (anterior.kind == MIENTRAS && token.kind == APERTURA_BLOQUE)
+      if (anterior.kind == MIENTRAS && (token.kind == APERTURA_BLOQUE || esInicioDeSentencia(token.kind)))
         return alta(token, "la estructura MIENTRAS requiere una condicion antes del bloque '{'.", "Se esperaba una condicion, por ejemplo 'MIENTRAS x < 10 {'.");
-      if (anterior.kind == REPETIR && (token.kind == APERTURA_BLOQUE || token.kind == FIN_INSTRUCCION))
-        return alta(token, "la estructura REPETIR requiere el numero de repeticiones.", "Se esperaba una expresion, por ejemplo 'REPETIR 5 {'.");
-      if (anterior.kind == EVALUAR && token.kind == APERTURA_BLOQUE)
+      if (anterior.kind == EVALUAR && (token.kind == APERTURA_BLOQUE || esInicioDeSentencia(token.kind)))
         return alta(token, "la estructura EVALUAR requiere la expresion a evaluar antes de '{'.", "Se esperaba una expresion despues de EVALUAR.");
 
       // --- 3c: Asignaciones incompletas ---
@@ -416,7 +533,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
       || tipo == CARACTER || tipo == VERDADERO || tipo == FALSO || tipo == APERTURA_PAREN || tipo == APERTURA_CORCHETE;
   }
   public static boolean esInicioDeSentencia(int tipo) {
-    return tipo == CONST || tipo == TIPO_ENT || tipo == TIPO_DEC || tipo == TIPO_CAD || tipo == TIPO_CAR || tipo == TIPO_BOO || tipo == SI || tipo == MIENTRAS || tipo == REPETIR || tipo == EVALUAR || tipo == IMP || tipo == OBT || tipo == TERMINAR || tipo == RET || tipo == IDENTIFICADOR;
+    return tipo == CONST || tipo == TIPO_ENT || tipo == TIPO_DEC || tipo == TIPO_CAD || tipo == TIPO_CAR || tipo == TIPO_BOO || tipo == SI || tipo == MIENTRAS || tipo == REPETIR || tipo == EVALUAR || tipo == HACER || tipo == IMP || tipo == OBT || tipo == TERMINAR || tipo == RET || tipo == IDENTIFICADOR;
   }
 
   private static void validarComentariosBloque(byte[] contenido) {

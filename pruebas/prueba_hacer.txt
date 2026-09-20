@@ -1,0 +1,80 @@
+# ==========================================
+# HACER MIENTRAS: casos validos y regresion de los bugs de cascada
+# especificos de su cola sintactica 'MIENTRAS ( condicion ) ;'.
+# PARTE 1 (validos): 0 errores.
+# PARTE 2 (cascada): cada bloque reporta exactamente 1 error.
+# ==========================================
+
+# --- PARTE 1: casos validos ---
+FUN simple() {
+    ENT i -> 0;
+    HACER {
+        i++;
+    } MIENTRAS (i < 5);
+}
+
+FUN condicionCompuesta(ENT x) {
+    HACER {
+        x --> 1;
+    } MIENTRAS (x > 0 AND x != 3);
+}
+
+FUN anidadoConSi(ENT n) {
+    HACER {
+        SI n > 10 {
+            n --> 5;
+        } SINO {
+            n--;
+        }
+    } MIENTRAS (n > 0);
+}
+
+# --- PARTE 2: regresion de cascada en la cola de HACER ---
+
+# Falta el bloque '{' tras HACER; la cola MIENTRAS parece valida y se rescata como tal.
+FUN hacerSinBloque(ENT i) {
+    HACER
+    MIENTRAS (i < 3);
+}
+
+# Falta MIENTRAS tras '}': un solo error, la sentencia siguiente no debe duplicarse.
+FUN hacerSinMientras() {
+    ENT i -> 0;
+    HACER {
+        i++;
+    }
+    IMP "siguiente";
+}
+
+# Falta '(' antes de la condicion.
+FUN hacerSinParentesis() {
+    ENT i -> 0;
+    HACER {
+        i++;
+    } MIENTRAS i < 3;
+}
+
+# Falta la condicion (parentesis vacios).
+FUN hacerSinCondicion() {
+    ENT i -> 0;
+    HACER {
+        i++;
+    } MIENTRAS ();
+}
+
+# Falta ')' de cierre.
+FUN hacerSinCierreParen() {
+    ENT i -> 0;
+    HACER {
+        i++;
+    } MIENTRAS (i < 3;
+}
+
+# Falta ';' final: la sentencia siguiente no debe duplicarse.
+FUN hacerSinPuntoYComa() {
+    ENT i -> 0;
+    HACER {
+        i++;
+    } MIENTRAS (i < 3)
+    IMP "siguiente";
+}

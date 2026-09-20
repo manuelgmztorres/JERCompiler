@@ -6,6 +6,15 @@ public class JERCompiler {
   static int totalErrores = 0;
   private int profundidadFuncion = 0;
 
+  /**
+   * Senal de "esta funcion no se puede recuperar con confianza, abandonar el resto de su
+   * cuerpo" (ver llavesDesbalanceadasEnFuncionActual). Al ser un RuntimeException (no
+   * ParseException) atraviesa limpiamente todos los try/catch(ParseException) intermedios,
+   * sin importar cuan anidados esten, hasta el unico lugar que la espera: DeclaracionFuncion().
+   */
+  static final class AbandonoRecuperacion extends RuntimeException {}
+  private boolean llavesDesbalanceadasEnFuncionActual = false;
+
   public static void main(String[] args) { ManejadorErrores.ejecutar(args); }
   static void reiniciarContadores() { totalCadenas = 0; totalErrores = 0; }
   void reportarError(ParseException e) { ManejadorErrores.reportarError(e); }
@@ -36,6 +45,16 @@ public class JERCompiler {
   void recuperarSentencia() {
     do {
       Token t = getToken(1);
+      if (t.kind == CIERRE_BLOQUE && llavesDesbalanceadasEnFuncionActual) {
+        // Este es el punto de decision real para el caso "sentencia rota + '}' propia TAMBIEN
+        // faltante": una sentencia fallo (p. ej. le falta ';'), Sentencia() ya se recupero por
+        // su cuenta, y estamos a punto de dejar esta '}' para el bloque exterior (la gramatica
+        // normal de Bloque() la consumiria sin pasar por ningun catch). Si esta funcion ya tiene
+        // un desbalance de llaves detectado, esa '}' puede no ser la que corresponde — mejor
+        // rendirse aqui con un solo diagnostico que dejar que Bloque() la trague como si nada.
+        ManejadorErrores.reportarDesbalanceDeLlaves(t);
+        throw new AbandonoRecuperacion();
+      }
       if(t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
       if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
       if(esSincronizacionDeSentencia(t)) return;
@@ -51,7 +70,7 @@ public class JERCompiler {
    */
   void consumirBloqueSuelto() {
     try {
-      Bloque();
+      Bloque(false, false);
     } catch (ParseException e) {
       reportarError(e);
     }
@@ -63,6 +82,34 @@ public class JERCompiler {
       t = getToken(1);
       if (t.kind == EOF || t.kind == APERTURA_BLOQUE || t.kind == CIERRE_BLOQUE || t.kind == FIN_INSTRUCCION
           || esSincronizacionDeSentencia(t)) return;
+      getNextToken();
+    } while (true);
+  }
+
+  /**
+   * Rescata una cabecera entre parentesis (la de REPETIR '( declaracion ; condicion ; paso )',
+   * o la lista de parametros de una funcion '( tipo id, ... )') tras un error. A diferencia de
+   * recuperarCabeceraBloque(), no puede parar en el primer token que parezca el inicio de una
+   * sentencia: un parametro o un paso rotos (p. ej. 'ENT inicio' o 'j +-> 1') tambien lo
+   * parecen, y dejarlos sueltos los reprocesaria como sentencias o declaraciones globales
+   * nuevas, generando errores en cascada (confirmado con fuzzing: una funcion con '(' faltante
+   * dejaba su parametro suelto, que luego se reinterpretaba como una declaracion global rota).
+   * En vez de eso, salta hasta el ')' que cierra la cabecera (respetando parentesis anidados,
+   * p. ej. 'j < (3 + 1)') y lo consume. Si '(' nunca llego a abrirse, simplemente salta hasta
+   * '{' sin necesitar un ')' que quiza no exista.
+   */
+  void recuperarCabeceraParentizada(boolean abierto) {
+    int profundidad = abierto ? 1 : 0;
+    do {
+      Token t = getToken(1);
+      if (t.kind == EOF || t.kind == APERTURA_BLOQUE || t.kind == CIERRE_BLOQUE) return;
+      if (t.kind == APERTURA_PAREN) { profundidad++; getNextToken(); continue; }
+      if (t.kind == CIERRE_PAREN) {
+        getNextToken();
+        profundidad--;
+        if (profundidad <= 0) return;
+        continue;
+      }
       getNextToken();
     } while (true);
   }
@@ -82,6 +129,20 @@ public class JERCompiler {
   }
 
   /**
+   * Tokens que jamas pueden ser el inicio de otra Sentencia() dentro de un bloque: si el
+   * bloque nunca llega a su '}' (p. ej. porque falta) y el siguiente token es uno de estos,
+   * el bucle de Sentencia() de Bloque() debe parar aqui en vez de seguir intentando parsear
+   * mas contenido. 'permiteSino' es true solo cuando este Bloque() es el cuerpo "then" de un
+   * EstructuraSi() (el unico lugar donde un SINO que sigue es legitimamente la continuacion
+   * de la construccion, no basura): si el '}' de ese cuerpo falta, tratar SINO como fin de
+   * bloque evita que se consuma como sentencia invalida y que la EstructuraSi() (o cadena
+   * SINO SI) que sigue termine "robando" una llave de cierre que no le pertenece.
+   */
+  boolean esFinDeBloque(Token t, boolean permiteSino) {
+    return t.kind == CIERRE_BLOQUE || t.kind == EOF || (permiteSino && t.kind == SINO);
+  }
+
+  /**
    * Rescata el cuerpo completo de un bloque tras un error en su apertura o en su cierre:
    * analiza todas las sentencias que encuentre en lugar de sólo la primera, evitando que el
    * resto del cuerpo se desborde al nivel global.
@@ -89,18 +150,79 @@ public class JERCompiler {
    * Si el bloque nunca llegó a abrirse (faltaba la '{'), la '}' que se encuentre pertenece al
    * bloque exterior: hay que dejarla sin consumir para no desincronizar las llaves.
    */
-  void recuperarCuerpoBloque(boolean abierto) {
+  void recuperarCuerpoBloque(Token aperturaTok, boolean nivelSuperior) {
+    if (aperturaTok != null && llavesDesbalanceadasEnFuncionActual) {
+      // El bloque SI abrio bien, pero esta funcion tiene una cantidad de '{'/'}' que no cuadra
+      // en algun lugar (detectado de antemano, con certeza, contando toda la funcion). No hay
+      // forma confiable de saber si la '}' que sigue es realmente la mia o la de un nivel
+      // exterior (es ambiguo por naturaleza: ver comentario en ManejadorErrores). Rendirse aqui
+      // con un solo diagnostico es mas honesto que seguir adivinando sentencia por sentencia y
+      // terminar atribuyendo 2-4 errores al lugar equivocado.
+      ManejadorErrores.reportarDesbalanceDeLlaves(aperturaTok);
+      throw new AbandonoRecuperacion();
+    }
     do {
       Token t = getToken(1);
       if (t.kind == EOF || t.kind == SINO || t.kind == FUN) return;
       if (t.kind == CIERRE_BLOQUE) {
-        if (abierto) { getNextToken(); return;};
+        if (aperturaTok != null) { getNextToken(); return; }
+        // Este bloque nunca abrio, asi que esta '}' no puede ser suya por la gramatica normal.
+        // Si es el cuerpo de una funcion (nivelSuperior), no hay nada por encima que vaya a
+        // reclamarla jamas (Programa() nunca espera una '}' suelta) — consumirla siempre.
+        // Si no, solo si lo siguiente es OTRA '}' (o SINO/CUANDO/PRED) es señal de que esta '}'
+        // en realidad le tocaba a este bloque fantasma (compensa su '{' faltante): consumirla
+        // evita que el nivel que lo envuelve la tome como propia y deje huerfana la '}' que de
+        // verdad le corresponde a el. En cualquier otro caso se deja para el nivel exterior.
+        if (nivelSuperior) { getNextToken(); return; }
         int siguiente = getToken(2).kind;
-        if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED) getNextToken();
+        if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED || siguiente == CIERRE_BLOQUE) getNextToken();
         return;
       }
       if (t.kind == APERTURA_BLOQUE) {
         consumirBloqueSuelto();
+      } else if (esSincronizacionDeSentencia(t)) {
+        try {
+          Sentencia();
+        } catch (ParseException e) {
+          reportarError(e);
+          recuperarSentencia();
+        }
+      } else {
+        getNextToken();
+      }
+    } while (true);
+  }
+
+  /**
+   * Rescata el cuerpo de un EVALUAR cuyo '{' nunca abrio (o cuyo cierre fallo): recorre
+   * los CUANDO/PRED restantes como marcadores reconocidos (no como tokens fuera de
+   * contexto) y sigue analizando las sentencias de cada caso, evitando el error fantasma
+   * "CUANDO/PRED solo puede usarse dentro de EVALUAR" repetido una vez por caso.
+   */
+  void recuperarCuerpoEvaluar(Token aperturaTok) {
+    if (aperturaTok != null && llavesDesbalanceadasEnFuncionActual) {
+      // Mismo criterio que en recuperarCuerpoBloque(): EVALUAR abrio bien, pero esta funcion
+      // tiene un desbalance de llaves real en algun lugar; rendirse con un solo diagnostico.
+      ManejadorErrores.reportarDesbalanceDeLlaves(aperturaTok);
+      throw new AbandonoRecuperacion();
+    }
+    do {
+      Token t = getToken(1);
+      if (t.kind == EOF || t.kind == FUN) return;
+      if (t.kind == CIERRE_BLOQUE) {
+        if (aperturaTok != null) { getNextToken(); return; }
+        // Mismo criterio que recuperarCuerpoBloque(): si EVALUAR nunca abrio su '{' propia,
+        // esta '}' puede ser la que le tocaba (compensa su apertura faltante) si lo que sigue
+        // es otra '}' o un marcador SINO/CUANDO/PRED — de lo contrario se deja para quien
+        // envuelve a este EVALUAR.
+        int siguiente = getToken(2).kind;
+        if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED || siguiente == CIERRE_BLOQUE) getNextToken();
+        return;
+      }
+      if (t.kind == APERTURA_BLOQUE) {
+        consumirBloqueSuelto();
+      } else if (t.kind == CUANDO || t.kind == PRED) {
+        getNextToken();
       } else if (esSincronizacionDeSentencia(t)) {
         try {
           Sentencia();
@@ -126,7 +248,7 @@ TOKEN : {
   | < TIPO_CAR: "CAR" > | < TIPO_BOO: "BOO" > | < CONST: "CONST" >
 }
 TOKEN : {
-    < SI: "SI" > | < SINO: "SINO" > | < MIENTRAS: "MIENTRAS" > | < REPETIR: "REPETIR" >
+    < SI: "SI" > | < SINO: "SINO" > | < MIENTRAS: "MIENTRAS" > | < REPETIR: "REPETIR" > | < HACER: "HACER" >
   | < EVALUAR: "EVALUAR" > | < CUANDO: "CUANDO" > | < PRED: "PRED" > | < TERMINAR: "TERMINAR" >
   | < FUN: "FUN" > | < RET: "RET" > | < OBT: "OBT" > | < IMP: "IMP" >
 }
@@ -216,18 +338,24 @@ Token TipoDato() : { Token tipo; }
   | tipo=<TIPO_BOO> { return tipo; }
 }
 
-void DeclaracionFuncion() : {}
+void DeclaracionFuncion() : { boolean abierto = false; Token funTok; }
 {
+  { funTok = getToken(1); }
   try {
-    <FUN> <IDENTIFICADOR> <APERTURA_PAREN>
+    <FUN> <IDENTIFICADOR> <APERTURA_PAREN> { abierto = true; }
     ( ListaParametros() )?
     <CIERRE_PAREN>
   } catch (ParseException e) {
     reportarError(e);
-    recuperarCabeceraBloque();
+    recuperarCabeceraParentizada(abierto);
+    if (getToken(1).kind != APERTURA_BLOQUE) return;
   }
-  { profundidadFuncion++; }
-  Bloque()
+  { profundidadFuncion++; llavesDesbalanceadasEnFuncionActual = ManejadorErrores.hayDesbalanceDeLlavesEnFuncion(funTok); }
+  try {
+    Bloque(false, true)
+  } catch (AbandonoRecuperacion abandono) {
+    recuperarHasta(FUN, EOF);
+  }
   { profundidadFuncion--; }
 }
 
@@ -246,15 +374,25 @@ void Parametro() : { Token tipo; Token id; }
   }
 }
 
-void Bloque() : { boolean abierto = false; }
+void Bloque(boolean permiteSino, boolean nivelSuperior) : { Token aperturaTok = null; int funComoBasura = 0; }
 {
   try {
-    <APERTURA_BLOQUE> { abierto = true; }
-    ( LOOKAHEAD({ getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF }) Sentencia() )*
+    aperturaTok=<APERTURA_BLOQUE>
+    (
+      // Un FUN mal ubicado dentro de este bloque se tolera UNA vez como sentencia invalida
+      // (Sentencia()/SentenciaInvalida() lo reporta y descarta junto con su cuerpo, ver
+      // consumirBloqueSuelto()); si aparece un SEGUNDO FUN inmediatamente, es señal de que
+      // este bloque nunca va a encontrar su '}' real (p. ej. porque falta), y seguir
+      // intentando parsear el resto del archivo como sentencias de este bloque arrastraria
+      // cada funcion siguiente entera, generando una cascada. En ese caso se para aqui y se
+      // deja que <CIERRE_BLOQUE> falle con un unico error de '}' faltante.
+      LOOKAHEAD({ !esFinDeBloque(getToken(1), permiteSino) && (getToken(1).kind != FUN || funComoBasura++ == 0) })
+      Sentencia()
+    )*
     <CIERRE_BLOQUE>
   } catch (ParseException e) {
     reportarError(e);
-    recuperarCuerpoBloque(abierto);
+    recuperarCuerpoBloque(aperturaTok, nivelSuperior);
   }
 }
 
@@ -268,6 +406,7 @@ void Sentencia() : {}
       | LOOKAHEAD(<MIENTRAS>) EstructuraMientras()
       | LOOKAHEAD(<REPETIR>) EstructuraRepetir()
       | LOOKAHEAD(<EVALUAR>) EstructuraEvaluar()
+      | LOOKAHEAD(<HACER>) EstructuraHacer()
       | LOOKAHEAD(<IMP>) <IMP> Expresion() <FIN_INSTRUCCION>
       | LOOKAHEAD(<OBT>) <OBT> <IDENTIFICADOR> <FIN_INSTRUCCION>
       | LOOKAHEAD(<TERMINAR>) <TERMINAR> <FIN_INSTRUCCION>
@@ -326,12 +465,13 @@ void EstructuraSi() : {}
   } catch (ParseException e) {
     reportarError(e);
     recuperarCabeceraBloque();
+    if (getToken(1).kind != APERTURA_BLOQUE) return;
   }
-  Bloque()
+  Bloque(true, false)
   (
     LOOKAHEAD(<SINO>)
     <SINO>
-    Bloque()
+    ( LOOKAHEAD(<SI>) EstructuraSi() | Bloque(false, false) )
   )?
 }
 
@@ -343,23 +483,34 @@ void EstructuraMientras() : {}
   } catch (ParseException e) {
     reportarError(e);
     recuperarCabeceraBloque();
+    if (getToken(1).kind != APERTURA_BLOQUE) return;
   }
-  Bloque()
+  Bloque(false, false)
 }
 
-void EstructuraRepetir() : {}
+void EstructuraRepetir() : { int etapa = 0; boolean abierto = false; }
 {
   <REPETIR>
   try {
-    Expresion()
+    <APERTURA_PAREN> { etapa = 1; abierto = true; }
+    DeclaracionVariable() { etapa = 2; }
+    <FIN_INSTRUCCION> { etapa = 3; }
+    Condicion() { etapa = 4; }
+    <FIN_INSTRUCCION> { etapa = 5; }
+    PasoRepetir() { etapa = 6; }
+    <CIERRE_PAREN>
   } catch (ParseException e) {
-    reportarError(e);
-    recuperarCabeceraBloque();
+    ManejadorErrores.reportarCabeceraRepetirIncompleta(etapa, e);
+    recuperarCabeceraParentizada(abierto);
+    if (getToken(1).kind != APERTURA_BLOQUE) return;
   }
-  Bloque()
+  Bloque(false, false)
 }
 
-void EstructuraEvaluar() : {}
+void PasoRepetir() : {}
+{ <IDENTIFICADOR> ( ( <ASIG_INC> | <ASIG_DEC> ) Expresion() | <INC> | <DEC_OP> ) }
+
+void EstructuraEvaluar() : { Token aperturaTok = null; }
 {
   <EVALUAR>
   try {
@@ -367,23 +518,53 @@ void EstructuraEvaluar() : {}
   } catch (ParseException e) {
     reportarError(e);
     recuperarCabeceraBloque();
+    if (getToken(1).kind != APERTURA_BLOQUE) return;
   }
-  <APERTURA_BLOQUE>
+  try {
+    aperturaTok=<APERTURA_BLOQUE>
+    (
+      <CUANDO>
+      try {
+        Expresion() <DOS_PUNTOS>
+      } catch (ParseException e) {
+        reportarError(e);
+        recuperarHasta(CUANDO, PRED, CIERRE_BLOQUE, EOF);
+      }
+      ( LOOKAHEAD({ getToken(1).kind != CUANDO && getToken(1).kind != PRED && getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF && getToken(1).kind != FUN }) Sentencia() )*
+    )+
+    (
+      <PRED> <DOS_PUNTOS>
+      ( LOOKAHEAD({ getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF && getToken(1).kind != FUN }) Sentencia() )*
+    )?
+    <CIERRE_BLOQUE>
+  } catch (ParseException e) {
+    reportarError(e);
+    recuperarCuerpoEvaluar(aperturaTok);
+  }
+}
+
+void EstructuraHacer() : { int etapa = 0; }
+{
+  <HACER>
   (
-    <CUANDO>
-    try {
-      Expresion() <DOS_PUNTOS>
-    } catch (ParseException e) {
-      reportarError(e);
-      recuperarHasta(CUANDO, PRED, CIERRE_BLOQUE, EOF);
-    }
-    ( LOOKAHEAD({ getToken(1).kind != CUANDO && getToken(1).kind != PRED && getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF }) Sentencia() )*
-  )+
-  (
-    <PRED> <DOS_PUNTOS>
-    ( LOOKAHEAD({ getToken(1).kind != CIERRE_BLOQUE && getToken(1).kind != EOF }) Sentencia() )*
-  )?
-  <CIERRE_BLOQUE>
+      LOOKAHEAD({ getToken(1).kind == APERTURA_BLOQUE })
+      ( Bloque(false, false) { if (getToken(0).kind != CIERRE_BLOQUE) return; } )
+    |
+      {
+        ManejadorErrores.reportarBloqueFaltanteHacer(getToken(0), getToken(1));
+        if (getToken(1).kind != MIENTRAS) return;
+      }
+  )
+  try {
+    <MIENTRAS> { etapa = 1; }
+    <APERTURA_PAREN> { etapa = 2; }
+    Condicion() { etapa = 3; }
+    <CIERRE_PAREN> { etapa = 4; }
+    <FIN_INSTRUCCION>
+  } catch (ParseException e) {
+    ManejadorErrores.reportarColaHacerIncompleta(etapa, e);
+    recuperarSentencia();
+  }
 }
 
 void Condicion() : {}
@@ -426,7 +607,7 @@ Token TokenCualquiera() : { Token t; }
 {
   (
       t=<TIPO_ENT> | t=<TIPO_DEC> | t=<TIPO_CAD> | t=<TIPO_CAR> | t=<TIPO_BOO> | t=<CONST>
-    | t=<SI> | t=<SINO> | t=<MIENTRAS> | t=<REPETIR> | t=<EVALUAR> | t=<CUANDO> | t=<PRED>
+    | t=<SI> | t=<SINO> | t=<MIENTRAS> | t=<REPETIR> | t=<HACER> | t=<EVALUAR> | t=<CUANDO> | t=<PRED>
     | t=<TERMINAR> | t=<FUN> | t=<RET> | t=<OBT> | t=<IMP> | t=<VERDADERO> | t=<FALSO>
     | t=<NUMERO_DECIMAL> | t=<NUMERO_ENTERO> | t=<CADENA> | t=<CARACTER>
     | t=<STRING_NO_CERRADA> | t=<CARACTER_INVALIDO> | t=<ERROR_LEXICO>

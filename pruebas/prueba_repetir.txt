@@ -1,0 +1,92 @@
+# ==========================================
+# REPETIR estilo for: (declaracion; condicion; paso).
+# PARTE 1 (validos): 0 errores.
+# PARTE 2 (cascada): cada bloque reporta exactamente 1 error, uno por
+# cada pieza de la cabecera que puede faltar.
+# ==========================================
+
+# --- PARTE 1: casos validos ---
+FUN simple() {
+    REPETIR (ENT j -> 0; j < 5; j +-> 1) {
+        IMP j;
+    }
+}
+
+FUN descendente() {
+    REPETIR (ENT j -> 5; j > 0; j --> 1) {
+        IMP j;
+    }
+}
+
+FUN pasoConIncremento() {
+    REPETIR (ENT j -> 0; j < 5; j++) {
+        IMP j;
+    }
+}
+
+FUN pasoConDecremento() {
+    REPETIR (ENT j -> 5; j > 0; j--) {
+        IMP j;
+    }
+}
+
+FUN anidadoConSi() {
+    REPETIR (ENT j -> 0; j < 3; j +-> 1) {
+        SI j = 1 {
+            IMP "medio";
+        } SINO {
+            IMP j;
+        }
+    }
+}
+
+# --- PARTE 2: regresion de cascada, una etapa por caso ---
+
+# Falta '(' despues de REPETIR.
+FUN repetirSinParentesis() {
+    REPETIR ENT j -> 0; j < 3; j +-> 1 {
+        IMP j;
+    }
+}
+
+# Falta la declaracion de la variable de control.
+FUN repetirSinDeclaracion() {
+    REPETIR (; j < 3; j +-> 1) {
+        IMP j;
+    }
+}
+
+# Falta ';' despues de la declaracion.
+FUN repetirSinPrimerPuntoYComa() {
+    REPETIR (ENT j -> 0 j < 3; j +-> 1) {
+        IMP j;
+    }
+}
+
+# Falta la condicion (dos ';' seguidos).
+FUN repetirSinCondicion() {
+    REPETIR (ENT j -> 0; ; j +-> 1) {
+        IMP j;
+    }
+}
+
+# Falta ';' despues de la condicion.
+FUN repetirSinSegundoPuntoYComa() {
+    REPETIR (ENT j -> 0; j < 3 j +-> 1) {
+        IMP j;
+    }
+}
+
+# Falta el paso.
+FUN repetirSinPaso() {
+    REPETIR (ENT j -> 0; j < 3;) {
+        IMP j;
+    }
+}
+
+# Falta ')' de cierre.
+FUN repetirSinCierreParen() {
+    REPETIR (ENT j -> 0; j < 3; j +-> 1 {
+        IMP j;
+    }
+}

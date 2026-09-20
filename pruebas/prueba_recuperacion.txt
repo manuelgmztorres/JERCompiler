@@ -25,6 +25,103 @@ ENT a -> ; DEC b -> ;
 # Arreglo con indice sin cerrar.
 ENT datos[3 -> [1, 2];
 
+# Bloque SI sin condicion: la sentencia valida que sigue no debe generar un segundo error.
+FUN siSinCondicion() {
+    SI
+    IMP "solo uno";
+}
+
+# Bloque MIENTRAS sin condicion: la sentencia valida que sigue no debe generar un segundo error.
+FUN mientrasSinCondicion() {
+    MIENTRAS
+    IMP "solo uno";
+}
+
+# Bloque REPETIR sin cabecera '(...)': la sentencia valida que sigue no debe generar un segundo error.
+FUN repetirSinCabecera() {
+    REPETIR
+    IMP "solo uno";
+}
+
+# Bloque REPETIR con cabecera a medias (falta la condicion y el paso): un solo error.
+FUN repetirCabeceraAMedias() {
+    REPETIR (ENT j -> 0;
+    IMP "solo uno";
+}
+
+# EVALUAR sin '{' de apertura: los CUANDO/PRED no deben tratarse como fuera de contexto.
+FUN evaluarSinLlave(ENT nota) {
+    EVALUAR nota
+        CUANDO 10:
+            IMP "excelente";
+        CUANDO 9:
+            IMP "muy bien";
+        PRED:
+            IMP "revisar";
+}
+
+# Cadena SINO SI con condicion rota en el eslabon intermedio: un solo error,
+# el SINO final no debe generar ruido adicional.
+FUN sinoSiRoto(ENT n) {
+    SI n > 90 {
+        IMP "excelente";
+    } SINO SI {
+        IMP "bien";
+    } SINO {
+        IMP "otro";
+    }
+}
+
+# Funcion de nivel superior sin llave de apertura: un solo error, la funcion
+# siguiente no debe verse afectada.
+FUN sinLlaveDeApertura(ENT n)
+    SI (n <= 1) {
+        RET 1;
+    } SINO {
+        RET n * 2;
+    }
+}
+
+FUN despuesDeLaRota() {
+    IMP "sigo bien";
+}
+
+# Funcion anidada dentro de otra que si tiene su cierre real: dos errores
+# (la anidacion invalida y el ';' faltante que deja), sin arrastrar mas.
+FUN externa() {
+    FUN interna() {
+        RET 1;
+    }
+    RET 0;
+}
+
+# SI anidado dentro de otro SI, con su propia llave de apertura faltante:
+# un solo error, el resto de la cadena y el cierre de la funcion no deben
+# verse afectados.
+FUN siAnidadoSinLlave(ENT limite) {
+    SI (limite >= 10) {
+        SI limite = 50
+            TERMINAR;
+        }
+    } SINO {
+        IMP "fuera de rango";
+    }
+}
+
+# Sentencia rota y la llave de cierre de su propio bloque faltan a la vez, en
+# una cadena SINO SI: solo el ';' faltante y el aviso de llaves sin cuadrar,
+# sin arrastrar el resto del archivo.
+FUN clasificarConDobleDefecto(ENT nota) {
+    SI nota > 90 {
+        IMP "excelente";
+    } SINO SI nota > 70 {
+        IMP "bien";
+    } SINO SI nota > 50 {
+        IMP "regular";
+    } SINO {
+        IMP "reprobado"
+}
+
 # Bloque MIENTRAS sin llave de cierre al final del archivo.
 FUN sinLlaveDeCierre() {
     ENT i -> 0;

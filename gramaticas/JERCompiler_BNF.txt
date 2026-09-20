@@ -39,6 +39,7 @@ FUNCIONES Y SENTENCIAS
               | <EstructuraMientras>
               | <EstructuraRepetir>
               | <EstructuraEvaluar>
+              | <EstructuraHacer>
               | 'IMP' <Expresion> ';'
               | 'OBT' IDENTIFICADOR ';'
               | 'RET' <Expresion> ';'
@@ -56,10 +57,40 @@ FUNCIONES Y SENTENCIAS
 CONTROL DE FLUJO
 ----------------
 
-<EstructuraSi>       ::= 'SI' <Condicion> <Bloque> ( 'SINO' <Bloque> )?
+<EstructuraSi> ::= 'SI' <Condicion> <Bloque> ( 'SINO' ( <EstructuraSi> | <Bloque> ) )?
+
+  El operador 'SINO' se puede encadenar directamente con otro 'SI' (else-if) sin
+  necesitar llaves adicionales alrededor del SI anidado:
+    SI nota > 90 {
+        IMP "excelente";
+    } SINO SI nota > 70 {
+        IMP "bien";
+    } SINO {
+        IMP "revisar";
+    }
+
 <EstructuraMientras> ::= 'MIENTRAS' <Condicion> <Bloque>
-<EstructuraRepetir>  ::= 'REPETIR' <Expresion> <Bloque>
-<EstructuraEvaluar>  ::= 'EVALUAR' <Expresion> '{'
+
+<EstructuraRepetir> ::= 'REPETIR' '(' <DeclaracionVariable> ';' <Condicion> ';' <PasoRepetir> ')' <Bloque>
+<PasoRepetir>        ::= IDENTIFICADOR ( ( '+->' | '-->' ) <Expresion> | '++' | '--' )
+
+  Ciclo estilo 'for' clásico: declara su propia variable de control, condición de
+  parada y paso de incremento/decremento, todo dentro de la cabecera entre
+  paréntesis (reemplaza la forma antigua 'REPETIR N { ... }'):
+    REPETIR (ENT i -> 0; i < 10; i++) {
+        IMP i;
+    }
+
+<EstructuraHacer> ::= 'HACER' <Bloque> 'MIENTRAS' '(' <Condicion> ')' ';'
+
+  Ciclo que se ejecuta al menos una vez (do-while); la condición al final va
+  entre paréntesis obligatorios, y la sentencia completa termina con ';':
+    HACER {
+        IMP i;
+        i--;
+    } MIENTRAS (i > 0);
+
+<EstructuraEvaluar> ::= 'EVALUAR' <Expresion> '{'
                          ( 'CUANDO' <Expresion> ':' <Sentencia>* )+
                          ( 'PRED' ':' <Sentencia>* )? '}'
 
@@ -93,32 +124,72 @@ LÉXICO Y COMENTARIOS
 - Operadores aritméticos: '+' (suma), '-' (resta/unario), '*' (mult), '/' (div),
   '%' (módulo), '**' (potencia), '//' (raíz cuadrada).
 - Asignaciones: '->' (asignación), '+->' (suma y asigna), '-->' (resta y asigna).
+- Incremento/decremento: '++', '--' (como sentencia propia o como paso de REPETIR).
 - Comparación de igualdad: '=' (se usa un solo signo igual para comparar).
 
 ESTRATEGIA DE RECUPERACIÓN DE ERRORES (MODO PÁNICO)
 ---------------------------------------------------
 
-1. Desacoplamiento jerárquico: errores en cabeceras de funciones o estructuras
-   (SI, MIENTRAS, REPETIR, EVALUAR) reportan el fallo y sincronizan con '{',
-   permitiendo analizar todas las sentencias internas del bloque.
+Principio general: cada regla de recuperación usa contexto que la propia gramática
+ya conoce en ese punto (qué construcción se está parseando, si una llave/paréntesis
+alcanzó a abrirse, si el bloque puede ser legítimamente seguido por SINO, etc.) en
+vez de adivinar el significado de un token después de que la excepción ya ocurrió.
+El diagnóstico por excepción genérica (capas de heurísticas sobre el token que causó
+el fallo) se reserva como último recurso, y solo dispara si se corrobora contra lo
+que la gramática esperaba en ese punto (nunca por la sola identidad del token).
+
+1. Cabeceras entre paréntesis: la lista de parámetros de una función y la cabecera
+   de REPETIR '(declaración; condición; paso)' comparten la misma recuperación
+   (recuperarCabeceraParentizada): si el paréntesis de apertura ya se consumió,
+   salta hasta su ')' de cierre respetando paréntesis anidados dentro de la
+   expresión; si nunca se abrió, salta directo hasta '{' sin necesitar un ')' que
+   quizás no exista. Evita que un parámetro o un paso rotos se reinterpreten como
+   una declaración global o una sentencia nueva.
+
 2. Sincronización por FIRST(Sentencia) refinada: el recuperador se detiene al
    detectar el inicio de la siguiente sentencia (ENT, DEC, SI, IMP, etc.). Un
    IDENTIFICADOR sólo cuenta como inicio si le sigue un operador de asignación
    ('->', '+->', '-->'), '(', '[', '++' o '--'; de lo contrario se trataría
    cualquier identificador suelto como sincronización y se reanalizaría basura,
    generando errores en cascada.
+
 3. Resiliencia de bloques: si falta la llave '{' de un Bloque, el error se
    reporta y se analizan TODAS las sentencias del cuerpo huérfano (no sólo la
-   primera), hasta encontrar '}', SINO, FUN o EOF. El recuperador recuerda si
-   la llave de apertura llegó a consumirse: si nunca se abrió, la '}' que
-   encuentra pertenece al bloque exterior y se deja sin consumir.
+   primera), hasta encontrar '}', SINO, FUN o EOF. El recuperador recuerda el
+   token de apertura realmente consumido (no solo un booleano): si el bloque
+   nunca abrió, la '}' que encuentra normalmente pertenece al bloque exterior y
+   se deja sin consumir — salvo que sea el cuerpo de una función (nada por
+   encima la reclamaría jamás) o que lo siguiente sea otra '}'/SINO/CUANDO/PRED
+   (señal de que esa '}' compensa la apertura fantasma de este mismo bloque).
+   El cuerpo "then" de un SI se marca como "puede terminar en SINO": si le
+   falta su '}', el SINO que sigue no se trata como basura, permitiendo que
+   una cadena 'SINO SI' recupere el resto de la cadena limpiamente.
+
 4. Protección de llaves durante la sincronización global o de sentencia: si al
    descartar tokens se encuentra una '{' suelta, no se salta token por token
    (eso desbalancearía las llaves); en su lugar se analiza como un Bloque()
    completo, y sus propios errores internos se reportan por separado.
-5. Supresión de diagnósticos derivados: los mensajes genéricos ("token
+
+5. Rendición conservadora ante desbalance real de llaves: al entrar a cada
+   función se cuenta, de antemano y con certeza (usando la tabla completa de
+   tokens), si sus '{' y '}' cuadran. Cuando un bloque interno abrió bien pero
+   la sentencia que falló está a punto de "dejar" una '}' ambigua para el
+   nivel exterior, y ya se sabe que esa función tiene un desbalance real, no
+   hay forma fiable de saber a cuál bloque específico le falta su cierre — es
+   una ambigüedad genuina del texto, no una limitación de la heurística. En
+   ese caso el analizador se rinde con un único diagnóstico ("la cantidad de
+   '{' y '}' en esta función no cuadra") y salta directo a la siguiente FUN,
+   en vez de seguir adivinando sentencia por sentencia y atribuir varios
+   errores al lugar equivocado.
+
+6. Supresión de diagnósticos derivados: los mensajes genéricos ("token
    inesperado", coma o cierre fuera de lugar) se suprimen si aparecen a menos
    de dos tokens del último error ya reportado, evitando que un solo error real
    produzca varios diagnósticos redundantes. Los mensajes específicos (tipo de
    estructura, instrucción incompleta, palabra reservada mal escrita, etc.)
-   siempre se reportan, sin importar la distancia.
+   siempre se reportan, sin importar la distancia. Los antiguos chequeos por
+   identidad de token (p. ej. "todo RET/SINO/CUANDO/PRED que aparezca aquí está
+   mal usado") se eliminaron: esos casos ya se reportan por llamada directa
+   desde la gramática en el momento en que se detectan, y un chequeo genérico
+   por identidad de token resultaba en falsos positivos cuando el mismo token
+   aparecía como víctima colateral de un error distinto.
