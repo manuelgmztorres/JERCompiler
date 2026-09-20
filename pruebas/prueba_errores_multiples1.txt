@@ -16,7 +16,7 @@ ENT vector[5] -> [10, 20  30, 40, 50];
 DEC matriz[2][3] -> [[1.1, 1.2, 1.3], [2.1, 2.2, 2.3]];
 
 # Funcion recursiva: llamadas entre funciones, RET, condicion SI/SINO.
-FUN factorial(ENT n) {
+FUN ENT factorial(ENT n) {
     SI (n <= 1) {
         RET 1;
     } SINO {
@@ -25,7 +25,7 @@ FUN factorial(ENT n) {
 }
 
 # Operadores aritmeticos completos: + - * / % ** //
-FUN calcular(DEC base, DEC exponente  {
+FUN DEC calcular(DEC base, DEC exponente  {
     DEC potencia -> base ** exponente;
     DEC raiz -> base // 2.0;
     DEC residuo -> base % 2.0;
@@ -33,7 +33,7 @@ FUN calcular(DEC base, DEC exponente  {
 }
 
 # EVALUAR / CUANDO / PRED
-FUN evaluarNota(ENT nota) {
+FUN VACIO evaluarNota(ENT nota) {
     EVALUAR nota {
         CUANDO 10:
             IMP "Excelente";
@@ -48,7 +48,7 @@ FUN evaluarNota(ENT nota) {
 }
 
 # MIENTRAS, REPETIR, SI/SINO anidado, operadores relacionales y logicos.
-FUN controlDeFlujo(ENT limite) {
+FUN VACIO controlDeFlujo(ENT limite) {
     ENT i -> 0;
     MIENTRAS i < limite AND (activo = FALSO OR contador != 0) {
         vector[i] -> vector[i] * 2;
@@ -68,7 +68,7 @@ FUN controlDeFlujo(ENT limite) {
 }
 
 # Entrada/salida y operadores de asignacion compuesta.
-FUN entradaSalida() {
+FUN VACIO entradaSalida() {
     ENT lectura -> 0;
     OBT lectura;
     lectura +-> 10;
@@ -78,7 +78,7 @@ FUN entradaSalida() {
 }
 
 # HACER / MIENTRAS: bucle que se ejecuta al menos una vez.
-FUN contarHastaCero ENT inicio) {
+FUN VACIO contarHastaCero ENT inicio) {
     ENT i -> inicio;
     HACER {
         IMP i;
@@ -87,7 +87,7 @@ FUN contarHastaCero ENT inicio) {
 }
 
 # Cadena SINO SI (else-if) sin llaves extra alrededor de cada SI anidado.
-FUN clasificar(ENT nota) {
+FUN VACIO clasificar(ENT nota) {
     SI nota > 90 {
         IMP "excelente";
     } SINO SI nota > 70 {
@@ -99,7 +99,7 @@ FUN clasificar(ENT nota) {
     }
 }
 
-FUN principal(  {
+FUN ENT principal(  {
     IMP SALUDO;
     controlDeFlujo(5);
     evaluarNota 9);

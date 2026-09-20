@@ -3,34 +3,34 @@
 # Cada caso reporta un unico error.
 
 # --- '==' en lugar de '=' para comparar ---
-FUN comparacionDoble(ENT n) {
+FUN VACIO comparacionDoble(ENT n) {
     SI (n == 0) {
         IMP "cero";
     }
 }
 
 # --- '=' usado como asignacion en lugar de '->' ---
-FUN asignacionConIgual() {
+FUN VACIO asignacionConIgual() {
     ENT total = 5;
 }
 
 # --- palabra reservada de JER escrita en minusculas ---
-FUN palabraEnMinuscula(ENT x) {
+FUN VACIO palabraEnMinuscula(ENT x) {
     si x > 0 {
         IMP "positivo";
     }
 }
 
 # --- funciones anidadas: FUN solo se declara a nivel global ---
-FUN externa() {
-    FUN interna() {
+FUN ENT externa() {
+    FUN ENT interna() {
         RET 1;
     }
     RET 0;
 }
 
 # --- OBT usado con un valor en vez de una variable ---
-FUN leerValor() {
+FUN VACIO leerValor() {
     OBT 5;
 }
 
@@ -38,7 +38,7 @@ FUN leerValor() {
 CONST version -> 5;
 
 # --- dos SINO para un mismo SI ---
-FUN dobleRama(ENT x) {
+FUN ENT dobleRama(ENT x) {
     SI x > 0 {
         RET 1;
     } SINO {
@@ -49,7 +49,7 @@ FUN dobleRama(ENT x) {
 }
 
 # --- llamada a funcion sin parentesis ---
-FUN llamarSinParentesis() {
+FUN VACIO llamarSinParentesis() {
     IMP suma 1, 2;
 }
 
@@ -57,17 +57,17 @@ FUN llamarSinParentesis() {
 ENT lista -> [1, 2, ];
 
 # --- coma sobrante al final de los argumentos de una llamada ---
-FUN llamarConComaFinal() {
+FUN VACIO llamarConComaFinal() {
     IMP suma(1, 2, );
 }
 
 # --- parametro de funcion sin nombre ---
-FUN sinNombreDeParametro(ENT, ENT b) {
+FUN ENT sinNombreDeParametro(ENT, ENT b) {
     RET b;
 }
 
 # --- operador relacional repetido ---
-FUN condicionRota(ENT x) {
+FUN ENT condicionRota(ENT x) {
     SI (x > > 0) {
         RET 1;
     }

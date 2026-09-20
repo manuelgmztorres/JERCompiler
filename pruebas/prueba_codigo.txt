@@ -4,7 +4,7 @@ BOO bandera -> VERDADERO;
 CONST CAD nombre -> "Horacio";
 ENT vector[2] -> [1,2];
 
-FUN suma(){
+FUN VACIO suma(){
 	IMP("Ingrese el primer numero a sumar: ");
 	OBT num1;
 	IMP("Ingrese el segundo numero a sumar: ");
@@ -13,7 +13,7 @@ FUN suma(){
 	IMP(num1+num2);
 }
 
-FUN capturaBandera(BOO bandera){
+FUN VACIO capturaBandera(BOO bandera){
 	SI(bandera=VERDADERO){
 		IMP("La bandera no ha sido tomado");
 	}SINO{
@@ -21,7 +21,7 @@ FUN capturaBandera(BOO bandera){
 	}
 }
 
-FUN pruebaVector(ENT vector){
+FUN VACIO pruebaVector(ENT vector){
 	ENT contador -> 0;
 	REPETIR (ENT j -> 0; j < 5; j +-> 1){
 		IMP(vector[contador]);

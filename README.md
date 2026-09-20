@@ -9,13 +9,14 @@ JERCompiler es un analizador léxico y sintáctico desarrollado con JavaCC para 
 CONST DEC PI -> 3.14159;
 ENT edades[3] -> [18, 20, 21];
 DEC notas[2][2] -> [[9.5, 8.0], [7.0, 10.0]];
+ENT contador; # las variables ya no requieren valor inicial
 
-FUN promedio(DEC total, ENT cantidad) {
+FUN DEC promedio(DEC total, ENT cantidad) {
     DEC resultado -> total / cantidad;
     RET resultado;
 }
 
-FUN principal() {
+FUN VACIO principal() {
     ENT indice -> 0;
     notas[indice][1] -> 10.0;
     SI indice >= 0 {
@@ -33,7 +34,8 @@ FUN principal() {
 * **Comparaciones:** `=` (igualdad), `!=` (diferente), `<`, `<=`, `>`, `>=`.
 * **Lógica:** `AND`, `OR`, `NOT`.
 * **Control de flujo:** `SI`/`SINO`, `MIENTRAS`, `REPETIR`, `EVALUAR`/`CUANDO`/`PRED`, `TERMINAR`.
-* **Funciones y E/S:** `FUN`, `RET`, `IMP`, `OBT`.
+* **Funciones y E/S:** `FUN` requiere declarar su tipo de retorno antes del nombre (`ENT`/`DEC`/`CAD`/`CAR`/`BOO`, o `VACIO` si no retorna valor), `RET`, `IMP`, `OBT`.
+* **Variables:** `CONST` sigue requiriendo valor inicial; una variable normal puede declararse sin inicializar (`ENT contador;`).
 
 ---
 

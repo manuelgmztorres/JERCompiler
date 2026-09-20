@@ -6,31 +6,31 @@
 # ==========================================
 
 # --- PARTE 1: casos validos ---
-FUN simple() {
+FUN VACIO simple() {
     REPETIR (ENT j -> 0; j < 5; j +-> 1) {
         IMP j;
     }
 }
 
-FUN descendente() {
+FUN VACIO descendente() {
     REPETIR (ENT j -> 5; j > 0; j --> 1) {
         IMP j;
     }
 }
 
-FUN pasoConIncremento() {
+FUN VACIO pasoConIncremento() {
     REPETIR (ENT j -> 0; j < 5; j++) {
         IMP j;
     }
 }
 
-FUN pasoConDecremento() {
+FUN VACIO pasoConDecremento() {
     REPETIR (ENT j -> 5; j > 0; j--) {
         IMP j;
     }
 }
 
-FUN anidadoConSi() {
+FUN VACIO anidadoConSi() {
     REPETIR (ENT j -> 0; j < 3; j +-> 1) {
         SI j = 1 {
             IMP "medio";
@@ -43,49 +43,49 @@ FUN anidadoConSi() {
 # --- PARTE 2: regresion de cascada, una etapa por caso ---
 
 # Falta '(' despues de REPETIR.
-FUN repetirSinParentesis() {
+FUN VACIO repetirSinParentesis() {
     REPETIR ENT j -> 0; j < 3; j +-> 1 {
         IMP j;
     }
 }
 
 # Falta la declaracion de la variable de control.
-FUN repetirSinDeclaracion() {
+FUN VACIO repetirSinDeclaracion() {
     REPETIR (; j < 3; j +-> 1) {
         IMP j;
     }
 }
 
 # Falta ';' despues de la declaracion.
-FUN repetirSinPrimerPuntoYComa() {
+FUN VACIO repetirSinPrimerPuntoYComa() {
     REPETIR (ENT j -> 0 j < 3; j +-> 1) {
         IMP j;
     }
 }
 
 # Falta la condicion (dos ';' seguidos).
-FUN repetirSinCondicion() {
+FUN VACIO repetirSinCondicion() {
     REPETIR (ENT j -> 0; ; j +-> 1) {
         IMP j;
     }
 }
 
 # Falta ';' despues de la condicion.
-FUN repetirSinSegundoPuntoYComa() {
+FUN VACIO repetirSinSegundoPuntoYComa() {
     REPETIR (ENT j -> 0; j < 3 j +-> 1) {
         IMP j;
     }
 }
 
 # Falta el paso.
-FUN repetirSinPaso() {
+FUN VACIO repetirSinPaso() {
     REPETIR (ENT j -> 0; j < 3;) {
         IMP j;
     }
 }
 
 # Falta ')' de cierre.
-FUN repetirSinCierreParen() {
+FUN VACIO repetirSinCierreParen() {
     REPETIR (ENT j -> 0; j < 3; j +-> 1 {
         IMP j;
     }

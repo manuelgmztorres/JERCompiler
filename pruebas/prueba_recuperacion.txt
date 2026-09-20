@@ -2,7 +2,7 @@
 # que lo rodea no debe generar ruido adicional por efecto cascada.
 
 # Bloque SI sin llave de apertura: las 3 sentencias siguientes son validas.
-FUN sinLlaveDeApertura() {
+FUN VACIO sinLlaveDeApertura() {
     ENT x -> 1;
     SI x > 0
         IMP "uno";
@@ -14,7 +14,7 @@ FUN sinLlaveDeApertura() {
 $ $ $ $
 
 # Funcion con firma rota (coma sobrante) pero cuerpo valido.
-FUN firmaRota(ENT a, ) {
+FUN ENT firmaRota(ENT a, ) {
     ENT y -> 5;
     RET y;
 }
@@ -26,31 +26,31 @@ ENT a -> ; DEC b -> ;
 ENT datos[3 -> [1, 2];
 
 # Bloque SI sin condicion: la sentencia valida que sigue no debe generar un segundo error.
-FUN siSinCondicion() {
+FUN VACIO siSinCondicion() {
     SI
     IMP "solo uno";
 }
 
 # Bloque MIENTRAS sin condicion: la sentencia valida que sigue no debe generar un segundo error.
-FUN mientrasSinCondicion() {
+FUN VACIO mientrasSinCondicion() {
     MIENTRAS
     IMP "solo uno";
 }
 
 # Bloque REPETIR sin cabecera '(...)': la sentencia valida que sigue no debe generar un segundo error.
-FUN repetirSinCabecera() {
+FUN VACIO repetirSinCabecera() {
     REPETIR
     IMP "solo uno";
 }
 
 # Bloque REPETIR con cabecera a medias (falta la condicion y el paso): un solo error.
-FUN repetirCabeceraAMedias() {
+FUN VACIO repetirCabeceraAMedias() {
     REPETIR (ENT j -> 0;
     IMP "solo uno";
 }
 
 # EVALUAR sin '{' de apertura: los CUANDO/PRED no deben tratarse como fuera de contexto.
-FUN evaluarSinLlave(ENT nota) {
+FUN VACIO evaluarSinLlave(ENT nota) {
     EVALUAR nota
         CUANDO 10:
             IMP "excelente";
@@ -62,7 +62,7 @@ FUN evaluarSinLlave(ENT nota) {
 
 # Cadena SINO SI con condicion rota en el eslabon intermedio: un solo error,
 # el SINO final no debe generar ruido adicional.
-FUN sinoSiRoto(ENT n) {
+FUN VACIO sinoSiRoto(ENT n) {
     SI n > 90 {
         IMP "excelente";
     } SINO SI {
@@ -74,7 +74,7 @@ FUN sinoSiRoto(ENT n) {
 
 # Funcion de nivel superior sin llave de apertura: un solo error, la funcion
 # siguiente no debe verse afectada.
-FUN sinLlaveDeApertura(ENT n)
+FUN ENT sinLlaveDeApertura(ENT n)
     SI (n <= 1) {
         RET 1;
     } SINO {
@@ -82,14 +82,14 @@ FUN sinLlaveDeApertura(ENT n)
     }
 }
 
-FUN despuesDeLaRota() {
+FUN VACIO despuesDeLaRota() {
     IMP "sigo bien";
 }
 
 # Funcion anidada dentro de otra que si tiene su cierre real: dos errores
 # (la anidacion invalida y el ';' faltante que deja), sin arrastrar mas.
-FUN externa() {
-    FUN interna() {
+FUN ENT externa() {
+    FUN ENT interna() {
         RET 1;
     }
     RET 0;
@@ -98,7 +98,7 @@ FUN externa() {
 # SI anidado dentro de otro SI, con su propia llave de apertura faltante:
 # un solo error, el resto de la cadena y el cierre de la funcion no deben
 # verse afectados.
-FUN siAnidadoSinLlave(ENT limite) {
+FUN VACIO siAnidadoSinLlave(ENT limite) {
     SI (limite >= 10) {
         SI limite = 50
             TERMINAR;
@@ -111,7 +111,7 @@ FUN siAnidadoSinLlave(ENT limite) {
 # Sentencia rota y la llave de cierre de su propio bloque faltan a la vez, en
 # una cadena SINO SI: solo el ';' faltante y el aviso de llaves sin cuadrar,
 # sin arrastrar el resto del archivo.
-FUN clasificarConDobleDefecto(ENT nota) {
+FUN VACIO clasificarConDobleDefecto(ENT nota) {
     SI nota > 90 {
         IMP "excelente";
     } SINO SI nota > 70 {
@@ -123,7 +123,7 @@ FUN clasificarConDobleDefecto(ENT nota) {
 }
 
 # Bloque MIENTRAS sin llave de cierre al final del archivo.
-FUN sinLlaveDeCierre() {
+FUN VACIO sinLlaveDeCierre() {
     ENT i -> 0;
     MIENTRAS i < 3 {
         i +-> 1;

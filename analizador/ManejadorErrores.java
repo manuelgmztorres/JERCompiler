@@ -56,7 +56,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
 
   /** Palabras reservadas de JER, para detectarlas escritas en minusculas. */
   private static final Set<String> RESERVADAS = new HashSet<String>(Arrays.asList(
-    "ENT", "DEC", "CAD", "CAR", "BOO", "CONST", "SI", "SINO", "MIENTRAS", "REPETIR", "HACER",
+    "ENT", "DEC", "CAD", "CAR", "BOO", "VACIO", "CONST", "SI", "SINO", "MIENTRAS", "REPETIR", "HACER",
     "EVALUAR", "CUANDO", "PRED", "TERMINAR", "FUN", "RET", "OBT", "IMP",
     "VERDADERO", "FALSO", "AND", "OR", "NOT"));
 
@@ -353,6 +353,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
       // --- 3h: CONST sin tipo de dato (mensaje distinto al de un parametro) ---
       if (anterior.kind == CONST && token.kind == IDENTIFICADOR)
         return alta(token, "CONST requiere un tipo de dato antes del nombre de la constante.", "Se esperaba ENT, DEC, CAD, CAR o BOO.");
+
+      // --- 3h.1: FUN sin tipo de retorno (mensaje distinto al de un parametro/CONST) ---
+      if (anterior.kind == FUN && token.kind == IDENTIFICADOR)
+        return alta(token, "FUN requiere un tipo de retorno antes del nombre de la funcion.", "Se esperaba ENT, DEC, CAD, CAR, BOO o VACIO.");
 
       // --- 3i: Parametro de funcion sin nombre despues del tipo ---
       if (esTipoDato(anterior.kind) && (token.kind == SEPARADOR || token.kind == CIERRE_PAREN))

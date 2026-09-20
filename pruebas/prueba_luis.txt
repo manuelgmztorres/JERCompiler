@@ -1,4 +1,4 @@
-FUN main(){
+FUN VACIO main(){
     ENT positivo -> 0;
     ENT negativo -> 0;
     ENT ceros -> 0;

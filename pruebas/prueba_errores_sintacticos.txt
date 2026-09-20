@@ -4,7 +4,7 @@
 # --- Palabras reservadas de EVALUAR usadas fuera de contexto ---
 RET 1;
 
-FUN fueraDeContexto() {
+FUN ENT fueraDeContexto() {
     SINO;
     CUANDO 1: IMP "fuera de EVALUAR";
     PRED: IMP "fuera de EVALUAR";
@@ -12,21 +12,21 @@ FUN fueraDeContexto() {
 }
 
 # --- Instrucciones de E/S y control incompletas ---
-FUN instruccionesIncompletas() {
+FUN ENT instruccionesIncompletas() {
     IMP ;
     OBT ;
     RET ;
 }
 
 # --- Cabeceras de control de flujo vacias ---
-FUN cabecerasVacias() {
+FUN VACIO cabecerasVacias() {
     SI { IMP "A"; }
     MIENTRAS { IMP "B"; }
     REPETIR { IMP "C"; }
 }
 
 # --- Asignaciones y operadores incompletos ---
-FUN operadoresIncompletos() {
+FUN VACIO operadoresIncompletos() {
     ENT x -> ;
     ENT y -> 0;
     y +-> ;

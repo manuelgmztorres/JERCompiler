@@ -312,7 +312,7 @@ SKIP : { "/**" : ESTADO_COMENTARIO }
 
 TOKEN : {
     < TIPO_ENT: "ENT" > | < TIPO_DEC: "DEC" > | < TIPO_CAD: "CAD" >
-  | < TIPO_CAR: "CAR" > | < TIPO_BOO: "BOO" > | < CONST: "CONST" >
+  | < TIPO_CAR: "CAR" > | < TIPO_BOO: "BOO" > | < TIPO_VACIO: "VACIO" > | < CONST: "CONST" >
 }
 TOKEN : {
     < SI: "SI" > | < SINO: "SINO" > | < MIENTRAS: "MIENTRAS" > | < REPETIR: "REPETIR" > | < HACER: "HACER" >
@@ -465,7 +465,7 @@ void DeclaracionVariable()                      :
 {/*@bgen(jjtree) DeclaracionVariable */
   try {
 /*@egen*/
-  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> Expresion()/*@bgen(jjtree)*/
+  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> Expresion() )?/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -566,6 +566,21 @@ Token TipoDato() : { Token tipo; }
   | tipo=<TIPO_BOO> { return tipo; }
 }
 
+// Tipo de retorno de una funcion: todo lo que admite TipoDato() (para funciones que
+// devuelven un valor usable en expresiones, ver Base()/LlamadaFuncion()) mas VACIO,
+// para funciones que solo se usan por su efecto (E/S, mutacion de globales, etc.) y
+// no pueden aparecer dentro de una expresion. Separado de TipoDato() porque VACIO no
+// es valido para variables, constantes ni parametros.
+Token TipoRetorno() : { Token tipo; }
+{
+    tipo=<TIPO_ENT> { return tipo; }
+  | tipo=<TIPO_DEC> { return tipo; }
+  | tipo=<TIPO_CAD> { return tipo; }
+  | tipo=<TIPO_CAR> { return tipo; }
+  | tipo=<TIPO_BOO> { return tipo; }
+  | tipo=<TIPO_VACIO> { return tipo; }
+}
+
 void DeclaracionFuncion()                     : {/*@bgen(jjtree) DeclaracionFuncion */
                                                   ASTDeclaracionFuncion jjtn000 = new ASTDeclaracionFuncion(JJTDECLARACIONFUNCION);
                                                   boolean jjtc000 = true;
@@ -577,7 +592,7 @@ void DeclaracionFuncion()                     : {/*@bgen(jjtree) DeclaracionFunc
 /*@egen*/
   { funTok = getToken(1); }
   try {
-    <FUN> <IDENTIFICADOR> <APERTURA_PAREN> { abierto = true; }
+    <FUN> TipoRetorno() <IDENTIFICADOR> <APERTURA_PAREN> { abierto = true; }
     ( ListaParametros() )?
     <CIERRE_PAREN>
   } catch (ParseException e) {

@@ -1,11 +1,11 @@
 # Errores puramente lexicos: cada caso reporta un unico error [ERROR LEXICO].
 # El comentario de bloque sin cerrar va al final: consume todo lo que le sigue.
 
-FUN cadenaSinCerrar() {
+FUN VACIO cadenaSinCerrar() {
     IMP "cadena sin cerrar
 }
 
-FUN caracterInvalido() {
+FUN VACIO caracterInvalido() {
     CAR letra -> 'ab';
 }
 
