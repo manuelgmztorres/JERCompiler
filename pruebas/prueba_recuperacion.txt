@@ -122,6 +122,42 @@ FUN VACIO clasificarConDobleDefecto(ENT nota) {
         IMP "reprobado"
 }
 
+# ==========================================
+# Regresion CAPA 3l vs CAPA 4 (ManejadorErrores.diagnosticar): un identificador
+# seguido de otro identificador es el unico solape real entre "dos valores
+# seguidos sin operador" (CAPA 3l) y "falta ';'"/"falta '->'" (CAPA 4). Se
+# desambigua mirando si el segundo identificador arranca una AsignacionOLlamada
+# valida (ver pareceInicioDeSentenciaNueva en ManejadorErrores.java).
+# ==========================================
+
+# Falta ';' antes de una asignacion real: el identificador que sigue SI arranca
+# una sentencia nueva ('y -> 5;'), asi que debe ganar CAPA 4 ("falta ';'"), no
+# CAPA 3l ("falta un operador entre 'x' y 'y'").
+FUN VACIO faltaPuntoYComaAntesDeAsignacion() {
+    ENT x -> 1;
+    IMP x
+    y -> 5;
+}
+
+# Identificador suelto sin continuacion de sentencia: 'b' no arranca nada
+# valido despues, asi que debe seguir siendo CAPA 3l ("falta un operador").
+FUN VACIO valorSueltoSigueSiendoOperadorFaltante() {
+    ENT a -> 1;
+    ENT b -> 2;
+    ENT x -> a b;
+}
+
+# Falta '->' antes de una llamada a funcion: el identificador que sigue arranca
+# una llamada valida ('suma(1, 2);'), asi que tambien debe ceder a CAPA 4
+# ("falta el operador de asignacion '->'"), no a CAPA 3l.
+FUN ENT sumaRegresion(ENT a, ENT b) {
+    RET a + b;
+}
+FUN VACIO faltaFlechaAntesDeLlamada() {
+    ENT resultado;
+    resultado sumaRegresion(1, 2);
+}
+
 # Bloque MIENTRAS sin llave de cierre al final del archivo.
 FUN VACIO sinLlaveDeCierre() {
     ENT i -> 0;
