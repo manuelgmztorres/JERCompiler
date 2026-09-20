@@ -1,0 +1,24 @@
+FUN main(){
+    ENT positivo -> 0;
+    ENT negativo -> 0;
+    ENT ceros -> 0;
+
+    REPETIR (ENT i -> 1; i <= 5; i++){
+
+        ENT numero -> 0;
+        IMP "DAME UN NUMERO: ";
+        OBT numero;
+
+        SI(numero < 0){
+            negativo +->1;
+        } SINO SI (numero > 0){
+            positivo +-> 1;
+        } SINO {
+            ceros +-> 1;
+        }
+
+    }
+    IMP "NUMEROS POSITIVOS:" + positivo;
+    IMP "NUMEROS NEGATIVOS:" + negativo;
+    IMP "CEROS:" + ceros;
+}
