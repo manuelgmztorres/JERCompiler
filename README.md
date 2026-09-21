@@ -18,9 +18,10 @@ FUN DEC promedio(DEC total, ENT cantidad) {
 
 FUN VACIO principal() {
     ENT indice -> 0;
+    BOO indiceValido -> indice >= 0; # una comparacion tambien es un valor
     notas[indice][1] -> 10.0;
     SI indice >= 0 {
-        IMP "Índice válido";
+        IMP indiceValido;
     } SINO {
         OBT indice;
     }
@@ -31,7 +32,7 @@ FUN VACIO principal() {
 * **Tipos de datos:** `ENT` (entero), `DEC` (decimal), `CAD` (cadena), `CAR` (carácter) y `BOO` (booleano).
 * **Operadores de asignación:** `->` (asignación directa), `+->` (suma y asigna), `-->` (resta y asigna).
 * **Operadores aritméticos:** `+`, `-`, `*`, `/`, `%`, `**` (potencia), `//` (raíz cuadrada), `++` (incremento), `--` (decremento).
-* **Comparaciones:** `=` (igualdad), `!=` (diferente), `<`, `<=`, `>`, `>=`.
+* **Comparaciones:** `=` (igualdad), `!=` (diferente), `<`, `<=`, `>`, `>=`. Una comparación (o una combinación con `AND`/`OR`/`NOT`) también es un valor válido para inicializar, reasignar o retornar una variable/función `BOO` — no solo `VERDADERO`/`FALSO`.
 * **Lógica:** `AND`, `OR`, `NOT`.
 * **Control de flujo:** `SI`/`SINO`, `MIENTRAS`, `REPETIR`, `EVALUAR`/`CUANDO`/`PRED`, `TERMINAR`.
 * **Funciones y E/S:** `FUN` requiere declarar su tipo de retorno antes del nombre (`ENT`/`DEC`/`CAD`/`CAR`/`BOO`, o `VACIO` si no retorna valor), `RET`, `IMP`, `OBT`.

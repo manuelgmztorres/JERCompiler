@@ -34,8 +34,7 @@ FUN CAR inicial() {
 }
 
 FUN BOO esPositivo(ENT n) {
-    BOO resultado -> VERDADERO;
-    RET resultado;
+    RET n > 0;
 }
 
 # FUN VACIO: no retorna valor, solo se usa por su efecto.
@@ -48,6 +47,15 @@ FUN VACIO principal() {
     IMP saludo();
     IMP inicial();
     IMP esPositivo(x);
+
+    # Una condicion (comparaciones, AND/OR/NOT) tambien es un valor valido en
+    # el inicializador de una variable BOO, en RET (ya cubierto arriba en
+    # esPositivo) y al reasignar: no solo VERDADERO/FALSO u otra variable BOO.
+    BOO mayor -> x > y;
+    BOO compuesta -> (x > y) AND (y < 10);
+    mayor -> y >= x;
+    IMP mayor;
+    IMP compuesta;
 }
 
 # --- PARTE 2: casos invalidos ---

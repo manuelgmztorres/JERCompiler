@@ -491,7 +491,7 @@ void DeclaracionVariable()                      :
 {/*@bgen(jjtree) DeclaracionVariable */
   try {
 /*@egen*/
-  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> Expresion() )?/*@bgen(jjtree)*/
+  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> ValorOCondicion() )?/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -525,7 +525,7 @@ void DeclaracionConstante()                       :
 {/*@bgen(jjtree) DeclaracionConstante */
   try {
 /*@egen*/
-  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> Expresion()/*@bgen(jjtree)*/
+  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> ValorOCondicion()/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -862,7 +862,7 @@ void SentenciaRetorno()                   : {/*@bgen(jjtree) SentenciaRetorno */
   t=<RET> {
     if (profundidadFuncion == 0) ManejadorErrores.reportarRetornoFueraFuncion(t);
   }
-  Expresion() <FIN_INSTRUCCION>/*@bgen(jjtree)*/
+  ValorOCondicion() <FIN_INSTRUCCION>/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -945,9 +945,9 @@ void AsignacionOLlamada()                     : {/*@bgen(jjtree) AsignacionOLlam
     | ( <APERTURA_CORCHETE> Expresion() <CIERRE_CORCHETE> )+
       (
           ( <INC> | <DEC_OP> ) <FIN_INSTRUCCION>
-        | OperadorAsignacion() Expresion() <FIN_INSTRUCCION>
+        | OperadorAsignacion() ValorOCondicion() <FIN_INSTRUCCION>
       )
-    | OperadorAsignacion() Expresion() <FIN_INSTRUCCION>
+    | OperadorAsignacion() ValorOCondicion() <FIN_INSTRUCCION>
   )/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
@@ -1274,6 +1274,19 @@ void EstructuraHacer()                  : {/*@bgen(jjtree) EstructuraHacer */
 
 void Condicion() : {}
 { ExpresionLogica() }
+
+// Usada donde antes solo se aceptaba Expresion() como valor (inicializador de
+// variable/constante, RET, lado derecho de una asignacion): permite ademas una
+// Condicion() completa (comparaciones, AND/OR/NOT), para que una variable/funcion
+// BOO se pueda inicializar/retornar/reasignar desde el resultado vivo de una
+// comparacion (antes solo aceptaba VERDADERO/FALSO u otra variable BOO). El
+// LOOKAHEAD(Condicion()) es un intento completo con backtracking: si falla (no
+// hay ningun operador relacional/AND/OR real), cae a Expresion() sin consumir
+// nada de mas \u2014 cualquier entrada puramente aritmetica sigue tomando esa rama,
+// porque ExpresionRelacional() exige un OperadorRelacional() real despues del
+// primer Expresion() para que el intento de Condicion() tenga exito.
+void ValorOCondicion() : {}
+{ LOOKAHEAD(Condicion()) Condicion() | Expresion() }
 
 void ExpresionLogica()                      : {/*@bgen(jjtree) #ExpresionLogica(> 1) */
   ASTExpresionLogica jjtn000 = new ASTExpresionLogica(JJTEXPRESIONLOGICA);
