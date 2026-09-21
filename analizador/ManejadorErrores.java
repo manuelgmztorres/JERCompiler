@@ -93,7 +93,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
     recolectarTokens(contenido);
     validarComentariosBloque(contenido);
     System.out.println("JERCompiler -- " + nombre);
-    try { new JERCompiler(new ByteArrayInputStream(contenido)).Programa(); }
+    try {
+      ASTPrograma raiz = new JERCompiler(new ByteArrayInputStream(contenido)).Programa();
+      new AnalizadorSemantico().analizar(raiz);
+    }
     catch (ParseException e) { reportarError(e); }
     catch (TokenMgrError e) { reportarErrorLexico(e); }
     volcarErrores();
@@ -169,6 +172,122 @@ public final class ManejadorErrores implements JERCompilerConstants {
    */
   public static void reportarErrorSemantico(int linea, int columna, String detalle, String sugerencia) {
     registrar(new ErrorJER("ERROR SEMANTICO", linea, columna, detalle, sugerencia, true));
+  }
+
+  /**
+   * Reporte centralizado para TablaSimbolos.declarar(): arma el mensaje segun las categorias en
+   * conflicto (variable/constante/parametro/funcion) en vez de dejar que cada punto de llamada del
+   * futuro visitor semantico redacte su propio texto. tokenNuevo es el identificador que se intento
+   * declarar; previo es el simbolo ya existente en ese mismo scope que devolvio declarar().
+   */
+  public static void reportarSimboloDuplicado(Token tokenNuevo, TablaSimbolos.Categoria categoriaNueva, TablaSimbolos.Simbolo previo) {
+    String nombre = tokenNuevo.image;
+    String comoPrevio = descripcionCategoria(previo.categoria);
+    String comoNuevo = descripcionCategoria(categoriaNueva);
+    registrar(new ErrorJER("ERROR SEMANTICO", tokenNuevo.beginLine, tokenNuevo.beginColumn,
+      "'" + nombre + "' ya fue declarado como " + comoPrevio + " en la linea " + previo.declaracion.beginLine
+        + "; no puede declararse de nuevo como " + comoNuevo + " en este mismo scope.",
+      "Use un nombre distinto o elimine la declaracion duplicada.", true));
+  }
+
+  public static void reportarVariableNoDeclarada(Token id) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' no esta declarado en este scope.",
+      "Declarelo antes de usarlo, o revise que el nombre este bien escrito.", true));
+  }
+
+  public static void reportarUsoDeFuncionComoValor(Token id) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' es una funcion; no puede usarse como un valor sin llamarla.",
+      "Se esperaba '" + id.image + "(argumentos)'.", true));
+  }
+
+  /** Dos tipos que debian coincidir (cadena aritmetica, elementos de un literal de arreglo) no coinciden. */
+  public static void reportarTipoIncompatibleEnOperacion(Token token, TablaSimbolos.TipoDato tipoA, TablaSimbolos.TipoDato tipoB) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "tipos incompatibles: " + tipoA + " y " + tipoB + " en la misma operacion.",
+      "JER no convierte tipos automaticamente; use valores del mismo tipo.", true));
+  }
+
+  /** Un operando de +,-,*,/,%,**,// (o el '-' unario) no es ENT ni DEC. */
+  public static void reportarOperandoNoNumerico(Token token, TablaSimbolos.TipoDato tipo) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "el tipo " + tipo + " no admite operadores aritmeticos.",
+      "Los operadores +, -, *, /, %, **, // solo se aplican a ENT o DEC.", true));
+  }
+
+  /** Una dimension de arreglo o un indice de acceso no dio tipo ENT. `contexto` ya viene en minusculas, p. ej. "un indice de arreglo". */
+  public static void reportarExpresionDebeSerEntera(Token token, TablaSimbolos.TipoDato tipo, String contexto) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      contexto + " debe ser de tipo ENT (se encontro " + tipo + ").",
+      "Se esperaba un valor entero.", true));
+  }
+
+  public static void reportarAridadArregloIncorrecta(Token token, String nombre, int usada, int declarada) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' se declaro con " + declarada + " dimension(es), pero se esta accediendo con " + usada + ".",
+      null, true));
+  }
+
+  /** La condicion de SI/MIENTRAS/REPETIR/HACER/una cadena AND-OR no dio tipo BOO (ver decision-condicion-boo-estricta: sin truthy). */
+  public static void reportarCondicionNoBooleana(Token token, TablaSimbolos.TipoDato tipo) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "la condicion debe ser de tipo BOO (se encontro " + tipo + ").",
+      "JER no trata otros tipos como verdadero/falso; use una comparacion o una variable BOO.", true));
+  }
+
+  /** <, <=, > o >= se uso entre dos valores del mismo tipo, pero ese tipo no es ENT ni DEC. */
+  public static void reportarOperadorOrdenNoNumerico(Token token, TablaSimbolos.TipoDato tipo) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "'" + token.image + "' solo compara ENT o DEC (se encontro " + tipo + ").",
+      "Para igualdad entre otros tipos use '=' o '!='.", true));
+  }
+
+  public static void reportarTerminarFueraDeContexto(Token token) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "TERMINAR solo puede usarse dentro de un bucle (MIENTRAS/REPETIR/HACER) o de un caso de EVALUAR.",
+      null, true));
+  }
+
+  /** Se intento llamar (con '(argumentos)') a un simbolo que existe pero no es una funcion. */
+  public static void reportarLlamadaANoFuncion(Token id, TablaSimbolos.Categoria categoriaReal) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' es " + descripcionCategoria(categoriaReal) + "; no se puede llamar como funcion.",
+      null, true));
+  }
+
+  public static void reportarNumeroArgumentosIncorrecto(Token id, String nombre, int dados, int esperados) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + nombre + "' espera " + esperados + " argumento(s), se dieron " + dados + ".",
+      null, true));
+  }
+
+  public static void reportarAsignacionAConstante(Token id, String nombre) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "no se puede modificar '" + nombre + "': es una constante (CONST).",
+      null, true));
+  }
+
+  public static void reportarUsoDeFuncionVacioComoValor(Token id) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' es VACIO (no retorna ningun valor); no puede usarse dentro de una expresion.",
+      null, true));
+  }
+
+  public static void reportarRetornoConValorEnFuncionVacio(Token token) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "esta funcion es VACIO; RET no puede devolver un valor aqui.",
+      "Quite la sentencia RET completa; una funcion VACIO termina sola al llegar al final del bloque.", true));
+  }
+
+  private static String descripcionCategoria(TablaSimbolos.Categoria categoria) {
+    switch (categoria) {
+      case VARIABLE: return "variable";
+      case CONSTANTE: return "constante";
+      case PARAMETRO: return "parametro";
+      case FUNCION: return "funcion";
+      default: return "simbolo";
+    }
   }
 
   public static void reportarBloqueFaltanteHacer(Token hacer, Token siguiente) {

@@ -1274,6 +1274,12 @@ if (jjtc000) {
     }
 }
 
+// El tercer hijo (cuando existe) es ambiguo por posicion: puede ser otro ASTEstructuraSi
+// (cadena "SINO SI") o un ASTBloque (rama "SINO" simple), y el AST no lo distingue por sí
+// solo. En vez de que el analizador semantico adivine con instanceof sobre ese hijo, el nodo
+// se etiqueta a si mismo via jjtSetValue()/jjtGetValue() (mecanismo estandar de JJTree, no
+// agrega hijos ni cambia la forma del arbol): null = sin SINO, Boolean.FALSE = SINO con
+// bloque simple, Boolean.TRUE = SINO SI encadenado.
   final public void EstructuraSi() throws ParseException {/*@bgen(jjtree) EstructuraSi */
   ASTEstructuraSi jjtn000 = new ASTEstructuraSi(JJTESTRUCTURASI);
   boolean jjtc000 = true;
@@ -1293,10 +1299,12 @@ reportarError(e);
         jj_consume_token(SINO);
         if (jj_2_16(2147483647)) {
           EstructuraSi();
+jjtn000.jjtSetValue(Boolean.TRUE);
         } else {
           switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
           case APERTURA_BLOQUE:{
             Bloque(false, false);
+jjtn000.jjtSetValue(Boolean.FALSE);
             break;
             }
           default:
@@ -1699,15 +1707,22 @@ if (jjtc000) {
 // con esa aritmetica una vez que decide que ya termino. Se delega todo parentesis
 // a Base(), que sí vive dentro de la cadena aritmetica normal (Termino/Factor) y
 // puede seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
-  final public void ExpresionRelacional() throws ParseException {/*@bgen(jjtree) #ExpresionRelacional(> 1) */
-  ASTExpresionRelacional jjtn000 = new ASTExpresionRelacional(JJTEXPRESIONRELACIONAL);
-  boolean jjtc000 = true;
-  jjtree.openNodeScope(jjtn000);
-  jjtn000.jjtSetFirstToken(getToken(1));
+// negado fuerza la creacion del nodo cuando hay NOT, aunque no haya operador relacional
+// (arity == 1): sin esto, "MIENTRAS NOT bandera { ... }" perdia el NOT por completo, porque
+// el nodo nunca llegaba a crearse (el Expresion() unico burbujeaba directo al padre) y NOT,
+// al no tener nodo propio, no queda registrado en ningun lado del arbol. Con negado, el nodo
+// se crea igual (con un solo hijo) y el analizador semantico distingue ese caso por la
+// cantidad de hijos (ver AnalizadorSemantico.visit(ASTExpresionRelacional...)).
+  final public void ExpresionRelacional() throws ParseException {/*@bgen(jjtree) #ExpresionRelacional( negado || jjtree . nodeArity ( ) > 1) */
+                                                                                      ASTExpresionRelacional jjtn000 = new ASTExpresionRelacional(JJTEXPRESIONRELACIONAL);
+                                                                                      boolean jjtc000 = true;
+                                                                                      jjtree.openNodeScope(jjtn000);
+                                                                                      jjtn000.jjtSetFirstToken(getToken(1));boolean negado = false;
     try {
       switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
       case NOT:{
         jj_consume_token(NOT);
+negado = true;
         break;
         }
       default:
@@ -1746,7 +1761,7 @@ if (jjtc000) {
     {if (true) throw (Error)jjte000;}
     } finally {
 if (jjtc000) {
-      jjtree.closeNodeScope(jjtn000, jjtree.nodeArity() > 1);
+      jjtree.closeNodeScope(jjtn000,  negado || jjtree . nodeArity ( ) > 1);
       jjtn000.jjtSetLastToken(getToken(0));
     }
     }
@@ -2662,6 +2677,13 @@ if (jjtc000) {
     return false;
   }
 
+  private boolean jj_3_18()
+ {
+    if (jj_scan_token(IDENTIFICADOR)) return true;
+    if (jj_scan_token(APERTURA_PAREN)) return true;
+    return false;
+  }
+
   private boolean jj_3R_null_378_29_16()
  {
     if (jj_3R_TipoDato_432_5_17()) return true;
@@ -2695,13 +2717,6 @@ if (jjtc000) {
   private boolean jj_3_11()
  {
     if (jj_scan_token(IMP)) return true;
-    return false;
-  }
-
-  private boolean jj_3_18()
- {
-    if (jj_scan_token(IDENTIFICADOR)) return true;
-    if (jj_scan_token(APERTURA_PAREN)) return true;
     return false;
   }
 
@@ -2747,6 +2762,12 @@ if (jjtc000) {
   }
 
   private boolean jj_3_6()
+ {
+    if (jj_scan_token(SI)) return true;
+    return false;
+  }
+
+  private boolean jj_3_16()
  {
     if (jj_scan_token(SI)) return true;
     return false;
@@ -2811,12 +2832,6 @@ if (jjtc000) {
     }
     }
     }
-    return false;
-  }
-
-  private boolean jj_3_16()
- {
-    if (jj_scan_token(SI)) return true;
     return false;
   }
 

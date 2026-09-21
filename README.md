@@ -1,6 +1,6 @@
 # JERCompiler
 
-JERCompiler es un analizador léxico y sintáctico desarrollado con JavaCC para un lenguaje general en español. Valida la estructura gramatical del programa y genera una tabla de tokens; no realiza análisis semántico ni genera código ejecutable.
+JERCompiler es un analizador léxico, sintáctico y semántico desarrollado con JavaCC/JJTree para un lenguaje general en español. Valida la estructura gramatical del programa, genera una tabla de tokens y verifica tipos, ámbitos y demás reglas semánticas sobre el AST resultante; no genera código ejecutable.
 
 ## Sintaxis principal
 
@@ -38,6 +38,20 @@ FUN VACIO principal() {
 * **Funciones y E/S:** `FUN` requiere declarar su tipo de retorno antes del nombre (`ENT`/`DEC`/`CAD`/`CAR`/`BOO`, o `VACIO` si no retorna valor), `RET`, `IMP`, `OBT`.
 * **Variables:** `CONST` sigue requiriendo valor inicial; una variable normal puede declararse sin inicializar (`ENT contador;`).
 
+## Análisis semántico
+
+Después de parsear, `AnalizadorSemantico` recorre el AST (vía el visitor `JERCompilerVisitor` que genera JJTree) en dos pasadas: la primera registra en una tabla de símbolos las variables, constantes y funciones globales (con su firma completa), para que una función pueda llamar a otra declarada más abajo en el archivo; la segunda entra a cada función y valida su cuerpo. Los errores que encuentra se imprimen como `[ERROR SEMANTICO]`, junto con los léxicos/sintácticos.
+
+Reglas que aplica:
+* **Tipos estrictos, sin conversión implícita:** `ENT` y `DEC` nunca se mezclan (ni entre sí ni con ningún otro tipo) en aritmética, comparaciones, asignaciones o retornos — el programador debe declarar el tipo correcto de antemano. La única excepción es `+`, que concatena si cualquiera de los dos lados es `CAD` (el resultado es `CAD`, sea cual sea el otro tipo); `-`, `*`, `/`, `%`, `**`, `//` nunca aceptan `CAD`.
+* **Condición estrictamente `BOO`:** la condición de `SI`/`MIENTRAS`/`REPETIR`/`HACER...MIENTRAS` (incluida una expresión sola o negada con `NOT`) debe ser de tipo `BOO`; no hay semántica "truthy" para `ENT`/`DEC`.
+* **Ámbitos (scopes):** cada bloque `{ }` (incluidos los de `SI`/`MIENTRAS`/`REPETIR`/`HACER`/`EVALUAR`) abre su propio ámbito anidado dentro de la función que lo contiene. Un parámetro o variable local puede ocultar (*shadowing*) a una variable/constante global del mismo nombre. Funciones y variables/constantes globales comparten un único espacio de nombres (no puede haber una función y una variable global con el mismo nombre).
+* **Arreglos:** las dimensiones de la declaración y los índices de acceso deben ser `ENT`; el número de índices usados debe coincidir exactamente con la aridad declarada (los arreglos se modifican elemento por elemento, no se puede reemplazar uno completo con `->`); los elementos de un literal de arreglo deben ser todos del mismo tipo.
+* **Funciones:** una llamada debe usar el número y tipo de argumentos exactos de la firma; una función `VACIO` no puede usarse como valor dentro de una expresión; `RET` debe coincidir con el tipo de retorno declarado (y una función `VACIO` no puede usar `RET` con valor).
+* **`TERMINAR`** solo es válido dentro de un bucle (`MIENTRAS`/`REPETIR`/`HACER`) o de un caso de `EVALUAR` (`CUANDO`/`PRED`).
+* **`CONST` y `OBT`:** no se puede reasignar ni leer (`OBT`) hacia una constante, ni usar un identificador de función como si fuera una variable.
+* La función `principal` no es obligatoria: el analizador no exige un punto de entrada con ese nombre.
+
 ---
 
 ## Compilación y Ejecución
@@ -52,15 +66,17 @@ El repositorio ya trae las clases compiladas en `build\`. Basta con ejecutar el 
 java -cp build JERCompiler pruebas\prueba_valida.txt
 ```
 
-Esto imprime los errores léxicos/sintácticos encontrados (si los hay) y actualiza `pruebas\tabla_tokens.txt` con la tabla de tokens del archivo analizado.
+Esto imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `pruebas\tabla_tokens.txt` con la tabla de tokens del archivo analizado. `pruebas\prueba_semantica_valida.txt` (0 errores esperados) y `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirven como referencia rápida de qué reglas semánticas aplica el analizador.
 
-### Voy a modificar el código (gramática o manejador de errores)
+### Voy a modificar el código (gramática, manejador de errores o analizador semántico)
 
 Desde la migración a JJTree, la gramática fuente es `analizador\JERCompiler_JJTree.jjt` (el antiguo `analizador\JERCompiler.jj` ya no se usa). Regenerar requiere tres pasos, no uno solo — ver `COMPILACION.md` para el detalle completo (por qué son tres pasos, notas de PowerShell, cuándo hace falta borrar los `AST*.java` generados). Resumen, parado en `analizador\`:
 
 ```powershell
 jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
 javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
-javac -d ..\build ..\build\*.java ManejadorErrores.java
+javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
 java -cp ..\build JERCompiler ..\pruebas\prueba_valida.txt
 ```
+
+Si el cambio es solo en `TablaSimbolos.java`, `AnalizadorSemantico.java` o `ManejadorErrores.java` (no en la gramática), alcanza con el paso de `javac` de arriba.

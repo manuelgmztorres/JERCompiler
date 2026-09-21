@@ -11,12 +11,16 @@ JERCompiler/
 ├── analizador/
 │   ├── JERCompiler_JJTree.jjt   ← gramática con JJTree (fuente principal)
 │   ├── JERCompiler.jj           ← gramática original (JavaCC puro, ya no se usa)
-│   └── ManejadorErrores.java    ← manejo de errores y tabla de tokens
+│   ├── ManejadorErrores.java    ← manejo de errores y tabla de tokens
+│   ├── TablaSimbolos.java       ← tabla de simbolos (scopes, declarar/resolver)
+│   └── AnalizadorSemantico.java ← analizador semantico (visitor de dos pasadas)
 ├── build/                       ← toda la salida generada y compilada (ver abajo)
 ├── gramaticas/
 └── pruebas/
     ├── prueba_codigo.txt
     ├── prueba_errores_lexicos.txt
+    ├── prueba_semantica_valida.txt    ← casos semanticos validos (0 errores)
+    ├── prueba_semantica_invalida.txt  ← casos semanticos invalidos, documentados
     ├── ...
     └── tabla_tokens.txt         ← generado automáticamente al ejecutar
 ```
@@ -68,17 +72,25 @@ Genera en `..\build` el resto de las clases del parser: `JERCompiler.java`,
 ### 3. Compilar todo con `javac`
 
 ```powershell
-javac -d ..\build ..\build\*.java ManejadorErrores.java
+javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
 ```
 
-Compila todos los `.java` generados junto con `ManejadorErrores.java` (que
-vive en `analizador`, no en `build`), dejando los `.class` en `..\build`.
+Compila todos los `.java` generados junto con `ManejadorErrores.java`,
+`TablaSimbolos.java` y `AnalizadorSemantico.java` (los tres viven en
+`analizador`, no en `build`), dejando los `.class` en `..\build`.
 
 ### 4. Ejecutar
 
 ```powershell
 java -cp ..\build JERCompiler ..\pruebas\prueba_codigo.txt
 ```
+
+`ManejadorErrores.ejecutar()` corre el análisis semántico automáticamente
+después de parsear (crea un `AnalizadorSemantico` y lo llama con el
+`ASTPrograma` que devuelve `JERCompiler.Programa()`) — no hace falta ningún
+paso ni flag aparte para activarlo, y corre siempre, incluso si hubo errores
+léxicos/sintácticos antes (ver el comentario junto a esa llamada en
+`ManejadorErrores.java` para el porqué).
 
 ## Notas sobre `-OUTPUT_DIRECTORY`
 
@@ -135,16 +147,19 @@ Desde `JERCompiler\analizador`:
 ```powershell
 jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
 javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
-javac -d ..\build ..\build\*.java ManejadorErrores.java
+javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
 java -cp ..\build JERCompiler ..\pruebas\prueba_codigo.txt
 ```
 
 ## Recompilar tras cambios
 
-- **Cambios solo en `ManejadorErrores.java`:** repite únicamente el paso 3
-  (`javac`).
+- **Cambios solo en `ManejadorErrores.java`, `TablaSimbolos.java` o
+  `AnalizadorSemantico.java`:** repite únicamente el paso 3 (`javac`).
 - **Cambios en la gramática (`.jjt`) que NO tocan la estructura de nodos
-  (`#Nombre`):** repite los pasos 1 a 3.
+  (`#Nombre`):** repite los pasos 1 a 3. Esto incluye agregar una condición
+  de creación de nodo distinta de `>N` (p. ej. `#Nombre(condicion)`, como el
+  caso de `ExpresionRelacional` con `NOT`) — no agrega ni quita nodos, solo
+  cambia cuándo se crea el mismo nodo.
 - **Cambios en la gramática que SÍ agregan/quitan/renombran nodos:** borra
   primero los `AST*.java` y `SimpleNode.java` afectados en `build` (JJTree no
   los regenera si ya existen), y luego repite los pasos 1 a 3.

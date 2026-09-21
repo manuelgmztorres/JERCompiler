@@ -994,6 +994,12 @@ void OperadorAsignacion()                     : {/*@bgen(jjtree) OperadorAsignac
 /*@egen*/
 }
 
+// El tercer hijo (cuando existe) es ambiguo por posicion: puede ser otro ASTEstructuraSi
+// (cadena "SINO SI") o un ASTBloque (rama "SINO" simple), y el AST no lo distingue por s\u00ed
+// solo. En vez de que el analizador semantico adivine con instanceof sobre ese hijo, el nodo
+// se etiqueta a si mismo via jjtSetValue()/jjtGetValue() (mecanismo estandar de JJTree, no
+// agrega hijos ni cambia la forma del arbol): null = sin SINO, Boolean.FALSE = SINO con
+// bloque simple, Boolean.TRUE = SINO SI encadenado.
 void EstructuraSi()               : {/*@bgen(jjtree) EstructuraSi */
   ASTEstructuraSi jjtn000 = new ASTEstructuraSi(JJTESTRUCTURASI);
   boolean jjtc000 = true;
@@ -1015,7 +1021,10 @@ void EstructuraSi()               : {/*@bgen(jjtree) EstructuraSi */
   (
     LOOKAHEAD(<SINO>)
     <SINO>
-    ( LOOKAHEAD(<SI>) EstructuraSi() | Bloque(false, false) )
+    (
+        LOOKAHEAD(<SI>) EstructuraSi() { jjtn000.jjtSetValue(Boolean.TRUE); }
+      | Bloque(false, false) { jjtn000.jjtSetValue(Boolean.FALSE); }
+    )
   )?/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
@@ -1325,15 +1334,21 @@ void ExpresionLogica()                      : {/*@bgen(jjtree) #ExpresionLogica(
 // con esa aritmetica una vez que decide que ya termino. Se delega todo parentesis
 // a Base(), que s\u00ed vive dentro de la cadena aritmetica normal (Termino/Factor) y
 // puede seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
-void ExpresionRelacional()                          : {/*@bgen(jjtree) #ExpresionRelacional(> 1) */
-  ASTExpresionRelacional jjtn000 = new ASTExpresionRelacional(JJTEXPRESIONRELACIONAL);
-  boolean jjtc000 = true;
-  jjtree.openNodeScope(jjtn000);
-  jjtn000.jjtSetFirstToken(getToken(1));
-/*@egen*/}
-{/*@bgen(jjtree) #ExpresionRelacional(> 1) */
+// negado fuerza la creacion del nodo cuando hay NOT, aunque no haya operador relacional
+// (arity == 1): sin esto, "MIENTRAS NOT bandera { ... }" perdia el NOT por completo, porque
+// el nodo nunca llegaba a crearse (el Expresion() unico burbujeaba directo al padre) y NOT,
+// al no tener nodo propio, no queda registrado en ningun lado del arbol. Con negado, el nodo
+// se crea igual (con un solo hijo) y el analizador semantico distingue ese caso por la
+// cantidad de hijos (ver AnalizadorSemantico.visit(ASTExpresionRelacional...)).
+void ExpresionRelacional()                                                        : {/*@bgen(jjtree) #ExpresionRelacional( negado || jjtree . nodeArity ( ) > 1) */
+                                                                                      ASTExpresionRelacional jjtn000 = new ASTExpresionRelacional(JJTEXPRESIONRELACIONAL);
+                                                                                      boolean jjtc000 = true;
+                                                                                      jjtree.openNodeScope(jjtn000);
+                                                                                      jjtn000.jjtSetFirstToken(getToken(1));
+/*@egen*/ boolean negado = false; }
+{/*@bgen(jjtree) #ExpresionRelacional( negado || jjtree . nodeArity ( ) > 1) */
   try {
-/*@egen*/ ( <NOT> )? Expresion() ( OperadorRelacional() Expresion() )?/*@bgen(jjtree)*/
+/*@egen*/ ( <NOT> { negado = true; } )? Expresion() ( OperadorRelacional() Expresion() )?/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -1350,7 +1365,7 @@ void ExpresionRelacional()                          : {/*@bgen(jjtree) #Expresio
     throw (Error)jjte000;
   } finally {
     if (jjtc000) {
-      jjtree.closeNodeScope(jjtn000, jjtree.nodeArity() > 1);
+      jjtree.closeNodeScope(jjtn000,  negado || jjtree . nodeArity ( ) > 1);
       jjtn000.jjtSetLastToken(getToken(0));
     }
   }
