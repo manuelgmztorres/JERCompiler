@@ -1,0 +1,70 @@
+# ==========================================
+# Funciones tipadas (FUN + tipo de retorno, VACIO) y declaracion de variables
+# con inicializador opcional.
+# PARTE 1 (validos): 0 errores.
+# PARTE 2 (invalidos): cada bloque reporta exactamente 1 error.
+# ==========================================
+
+# --- PARTE 1: casos validos ---
+
+# Variables sin inicializar (nuevo) y con inicializar, escalares y arreglo.
+ENT contadorGlobal;
+DEC promedioGlobal;
+ENT vectorSinValor[3];
+ENT vectorConValor[2] -> [1, 2];
+
+# CONST sigue requiriendo inicializador (no cambio).
+CONST DEC PI -> 3.14159;
+
+# FUN con cada tipo de retorno posible.
+FUN ENT sumar(ENT a, ENT b) {
+    RET a + b;
+}
+
+FUN DEC dividir(DEC a, DEC b) {
+    RET a / b;
+}
+
+FUN CAD saludo() {
+    RET "hola";
+}
+
+FUN CAR inicial() {
+    RET 'J';
+}
+
+FUN BOO esPositivo(ENT n) {
+    BOO resultado -> VERDADERO;
+    RET resultado;
+}
+
+# FUN VACIO: no retorna valor, solo se usa por su efecto.
+FUN VACIO principal() {
+    ENT x;
+    ENT y -> 5;
+    x -> sumar(y, 2);
+    IMP x;
+    IMP dividir(4.0, 2.0);
+    IMP saludo();
+    IMP inicial();
+    IMP esPositivo(x);
+}
+
+# --- PARTE 2: casos invalidos ---
+
+# Falta el tipo de retorno antes del nombre de la funcion.
+FUN sinTipoDeRetorno() {
+    RET 1;
+}
+
+# VACIO escrito en minusculas: no es la palabra reservada valida.
+FUN vacio minusculasVacio() {
+    IMP "hola";
+}
+
+# CONST sigue requiriendo inicializador (a diferencia de las variables normales).
+CONST ENT constSinValor;
+
+# VACIO no es un tipo de dato valido para una variable, solo para el
+# retorno de una funcion.
+VACIO variableVacia;

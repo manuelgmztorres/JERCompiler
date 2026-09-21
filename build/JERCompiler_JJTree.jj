@@ -1563,7 +1563,7 @@ void LlamadaFuncionSinId() : {}
 Token TokenCualquiera() : { Token t; }
 {
   (
-      t=<TIPO_ENT> | t=<TIPO_DEC> | t=<TIPO_CAD> | t=<TIPO_CAR> | t=<TIPO_BOO> | t=<CONST>
+      t=<TIPO_ENT> | t=<TIPO_DEC> | t=<TIPO_CAD> | t=<TIPO_CAR> | t=<TIPO_BOO> | t=<TIPO_VACIO> | t=<CONST>
     | t=<SI> | t=<SINO> | t=<MIENTRAS> | t=<REPETIR> | t=<HACER> | t=<EVALUAR> | t=<CUANDO> | t=<PRED>
     | t=<TERMINAR> | t=<FUN> | t=<RET> | t=<OBT> | t=<IMP> | t=<VERDADERO> | t=<FALSO>
     | t=<NUMERO_DECIMAL> | t=<NUMERO_ENTERO> | t=<CADENA> | t=<CARACTER>
