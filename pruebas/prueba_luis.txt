@@ -2,6 +2,7 @@ FUN VACIO main(){
     ENT positivo -> 0;
     ENT negativo -> 0;
     ENT ceros -> 0;
+    DEC ceros -> 0.0;
 
     REPETIR (ENT i -> 1; i <= 5; i++){
 
