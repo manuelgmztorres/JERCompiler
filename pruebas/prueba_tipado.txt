@@ -56,6 +56,18 @@ FUN VACIO principal() {
     mayor -> y >= x;
     IMP mayor;
     IMP compuesta;
+
+    # Una expresion sola (no solo una comparacion explicita) tambien es una
+    # condicion valida por si misma en SI/MIENTRAS/REPETIR.
+    SI mayor {
+        IMP "mayor es verdadera";
+    }
+    MIENTRAS NOT mayor {
+        mayor -> VERDADERO;
+    }
+    SI (x + y) > 0 {
+        IMP "sigue funcionando la comparacion con parentesis aritmeticos";
+    }
 }
 
 # --- PARTE 2: casos invalidos ---

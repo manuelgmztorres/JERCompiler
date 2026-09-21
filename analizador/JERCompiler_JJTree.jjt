@@ -412,13 +412,13 @@ void DeclaracionGlobal() : {}
 void DeclaracionVariable() #DeclaracionVariable :
 { Token tipo; Token id; }
 {
-  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> ValorOCondicion() )?
+  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> Condicion() )?
 }
 
 void DeclaracionConstante() #DeclaracionConstante :
 { Token tipo; Token id; }
 {
-  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> ValorOCondicion()
+  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> Condicion()
 }
 
 // #Dimensiones(>0): una variable escalar (sin '[ ]') no genera nodo alguno aqui;
@@ -553,7 +553,7 @@ void SentenciaRetorno() #SentenciaRetorno : { Token t; }
   t=<RET> {
     if (profundidadFuncion == 0) ManejadorErrores.reportarRetornoFueraFuncion(t);
   }
-  ValorOCondicion() <FIN_INSTRUCCION>
+  Condicion() <FIN_INSTRUCCION>
 }
 
 void SentenciaInvalida() #SentenciaInvalida : { Token t; }
@@ -574,9 +574,9 @@ void AsignacionOLlamada() #AsignacionOLlamada : {}
     | ( <APERTURA_CORCHETE> Expresion() <CIERRE_CORCHETE> )+
       (
           ( <INC> | <DEC_OP> ) <FIN_INSTRUCCION>
-        | OperadorAsignacion() ValorOCondicion() <FIN_INSTRUCCION>
+        | OperadorAsignacion() Condicion() <FIN_INSTRUCCION>
       )
-    | OperadorAsignacion() ValorOCondicion() <FIN_INSTRUCCION>
+    | OperadorAsignacion() Condicion() <FIN_INSTRUCCION>
   )
 }
 
@@ -698,27 +698,33 @@ void EstructuraHacer() #EstructuraHacer : { int etapa = 0; }
   }
 }
 
+// Tambien se usa donde antes solo se aceptaba Expresion() como valor
+// (inicializador de variable/constante, RET, lado derecho de una asignacion):
+// desde que ExpresionRelacional() acepta una Expresion() sola (ver abajo),
+// Condicion() es un superconjunto estricto de Expresion() — cualquier cosa que
+// Expresion() podia matchear, Condicion() tambien, asi que ya no hace falta un
+// wrapper aparte con LOOKAHEAD/backtracking para elegir entre ambas.
 void Condicion() : {}
 { ExpresionLogica() }
-
-// Usada donde antes solo se aceptaba Expresion() como valor (inicializador de
-// variable/constante, RET, lado derecho de una asignacion): permite ademas una
-// Condicion() completa (comparaciones, AND/OR/NOT), para que una variable/funcion
-// BOO se pueda inicializar/retornar/reasignar desde el resultado vivo de una
-// comparacion (antes solo aceptaba VERDADERO/FALSO u otra variable BOO). El
-// LOOKAHEAD(Condicion()) es un intento completo con backtracking: si falla (no
-// hay ningun operador relacional/AND/OR real), cae a Expresion() sin consumir
-// nada de mas — cualquier entrada puramente aritmetica sigue tomando esa rama,
-// porque ExpresionRelacional() exige un OperadorRelacional() real despues del
-// primer Expresion() para que el intento de Condicion() tenga exito.
-void ValorOCondicion() : {}
-{ LOOKAHEAD(Condicion()) Condicion() | Expresion() }
 
 void ExpresionLogica() #ExpresionLogica(>1) : {}
 { ExpresionRelacional() ( ( <AND> | <OR> ) ExpresionRelacional() )* }
 
+// El segundo Expresion()+OperadorRelacional() es opcional: una Expresion() sola
+// (p. ej. una variable BOO) tambien es una condicion valida por si misma, igual
+// que en la mayoria de los lenguajes (se evalua "su verdad"). La decision de
+// seguir o no es LL(1) normal de 1 token (¿sigue un operador relacional?), sin
+// ambiguedad.
+//
+// El '(' NO se maneja aqui (a diferencia de antes): un LOOKAHEAD(<APERTURA_PAREN>)
+// de 1 token que commitea "esto es una condicion agrupada" y that's it se rompe en
+// cuanto lo que sigue al ')' es mas aritmetica ("(a + b) * 2 / c" como valor de un
+// RET/asignacion, ver Base()) — ExpresionRelacional() no tiene forma de "seguir"
+// con esa aritmetica una vez que decide que ya termino. Se delega todo parentesis
+// a Base(), que sí vive dentro de la cadena aritmetica normal (Termino/Factor) y
+// puede seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
 void ExpresionRelacional() #ExpresionRelacional(>1) : {}
-{ LOOKAHEAD(<APERTURA_PAREN>) <APERTURA_PAREN> ExpresionLogica() <CIERRE_PAREN> | ( <NOT> )? Expresion() OperadorRelacional() Expresion() }
+{ ( <NOT> )? Expresion() ( OperadorRelacional() Expresion() )? }
 
 // Nodo propio: unico punto de uso, sin ambiguedad de posicion (ver comentario de diseño).
 void OperadorRelacional() #OperadorRelacional : {}
@@ -733,8 +739,13 @@ void Termino() #Termino(>1) : {}
 void Factor() #Factor(>1) : {}
 { Base() ( ( <POTENCIA> | <RAIZ> ) Base() )* }
 
+// El paréntesis se resuelve aquí (no en ExpresionRelacional(), ver comentario ahí)
+// usando Condicion() en vez de Expresion(): '(' es unico entre las alternativas de
+// Base(), asi que no hace falta LOOKAHEAD — una vez dentro, Condicion() ya cubre
+// tanto una sub-expresion aritmetica agrupada ("(a + b) * 2") como una condicion
+// agrupada ("(a > b) AND c"), sin ambiguedad, porque es un superconjunto estricto.
 void Base() : {}
-{ UnaryMinus() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Expresion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
+{ UnaryMinus() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Condicion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
 
 // Separado de Base() para que el '-' unario si quede marcado en el arbol (nodo propio),
 // sin afectar las demas alternativas de Base(), que siguen delegando de forma transparente.

@@ -491,7 +491,7 @@ void DeclaracionVariable()                      :
 {/*@bgen(jjtree) DeclaracionVariable */
   try {
 /*@egen*/
-  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> ValorOCondicion() )?/*@bgen(jjtree)*/
+  tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() ( <ASIGNACION> Condicion() )?/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -525,7 +525,7 @@ void DeclaracionConstante()                       :
 {/*@bgen(jjtree) DeclaracionConstante */
   try {
 /*@egen*/
-  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> ValorOCondicion()/*@bgen(jjtree)*/
+  <CONST> tipo=TipoDato() id=<IDENTIFICADOR> DimensionesDeclaracion() <ASIGNACION> Condicion()/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -862,7 +862,7 @@ void SentenciaRetorno()                   : {/*@bgen(jjtree) SentenciaRetorno */
   t=<RET> {
     if (profundidadFuncion == 0) ManejadorErrores.reportarRetornoFueraFuncion(t);
   }
-  ValorOCondicion() <FIN_INSTRUCCION>/*@bgen(jjtree)*/
+  Condicion() <FIN_INSTRUCCION>/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -945,9 +945,9 @@ void AsignacionOLlamada()                     : {/*@bgen(jjtree) AsignacionOLlam
     | ( <APERTURA_CORCHETE> Expresion() <CIERRE_CORCHETE> )+
       (
           ( <INC> | <DEC_OP> ) <FIN_INSTRUCCION>
-        | OperadorAsignacion() ValorOCondicion() <FIN_INSTRUCCION>
+        | OperadorAsignacion() Condicion() <FIN_INSTRUCCION>
       )
-    | OperadorAsignacion() ValorOCondicion() <FIN_INSTRUCCION>
+    | OperadorAsignacion() Condicion() <FIN_INSTRUCCION>
   )/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
@@ -1272,21 +1272,14 @@ void EstructuraHacer()                  : {/*@bgen(jjtree) EstructuraHacer */
 /*@egen*/
 }
 
+// Tambien se usa donde antes solo se aceptaba Expresion() como valor
+// (inicializador de variable/constante, RET, lado derecho de una asignacion):
+// desde que ExpresionRelacional() acepta una Expresion() sola (ver abajo),
+// Condicion() es un superconjunto estricto de Expresion() \u2014 cualquier cosa que
+// Expresion() podia matchear, Condicion() tambien, asi que ya no hace falta un
+// wrapper aparte con LOOKAHEAD/backtracking para elegir entre ambas.
 void Condicion() : {}
 { ExpresionLogica() }
-
-// Usada donde antes solo se aceptaba Expresion() como valor (inicializador de
-// variable/constante, RET, lado derecho de una asignacion): permite ademas una
-// Condicion() completa (comparaciones, AND/OR/NOT), para que una variable/funcion
-// BOO se pueda inicializar/retornar/reasignar desde el resultado vivo de una
-// comparacion (antes solo aceptaba VERDADERO/FALSO u otra variable BOO). El
-// LOOKAHEAD(Condicion()) es un intento completo con backtracking: si falla (no
-// hay ningun operador relacional/AND/OR real), cae a Expresion() sin consumir
-// nada de mas \u2014 cualquier entrada puramente aritmetica sigue tomando esa rama,
-// porque ExpresionRelacional() exige un OperadorRelacional() real despues del
-// primer Expresion() para que el intento de Condicion() tenga exito.
-void ValorOCondicion() : {}
-{ LOOKAHEAD(Condicion()) Condicion() | Expresion() }
 
 void ExpresionLogica()                      : {/*@bgen(jjtree) #ExpresionLogica(> 1) */
   ASTExpresionLogica jjtn000 = new ASTExpresionLogica(JJTEXPRESIONLOGICA);
@@ -1319,6 +1312,19 @@ void ExpresionLogica()                      : {/*@bgen(jjtree) #ExpresionLogica(
   }
 /*@egen*/ }
 
+// El segundo Expresion()+OperadorRelacional() es opcional: una Expresion() sola
+// (p. ej. una variable BOO) tambien es una condicion valida por si misma, igual
+// que en la mayoria de los lenguajes (se evalua "su verdad"). La decision de
+// seguir o no es LL(1) normal de 1 token (\u00bfsigue un operador relacional?), sin
+// ambiguedad.
+//
+// El '(' NO se maneja aqui (a diferencia de antes): un LOOKAHEAD(<APERTURA_PAREN>)
+// de 1 token que commitea "esto es una condicion agrupada" y that's it se rompe en
+// cuanto lo que sigue al ')' es mas aritmetica ("(a + b) * 2 / c" como valor de un
+// RET/asignacion, ver Base()) \u2014 ExpresionRelacional() no tiene forma de "seguir"
+// con esa aritmetica una vez que decide que ya termino. Se delega todo parentesis
+// a Base(), que s\u00ed vive dentro de la cadena aritmetica normal (Termino/Factor) y
+// puede seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
 void ExpresionRelacional()                          : {/*@bgen(jjtree) #ExpresionRelacional(> 1) */
   ASTExpresionRelacional jjtn000 = new ASTExpresionRelacional(JJTEXPRESIONRELACIONAL);
   boolean jjtc000 = true;
@@ -1327,7 +1333,7 @@ void ExpresionRelacional()                          : {/*@bgen(jjtree) #Expresio
 /*@egen*/}
 {/*@bgen(jjtree) #ExpresionRelacional(> 1) */
   try {
-/*@egen*/ LOOKAHEAD(<APERTURA_PAREN>) <APERTURA_PAREN> ExpresionLogica() <CIERRE_PAREN> | ( <NOT> )? Expresion() OperadorRelacional() Expresion()/*@bgen(jjtree)*/
+/*@egen*/ ( <NOT> )? Expresion() ( OperadorRelacional() Expresion() )?/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -1461,8 +1467,13 @@ void Factor()             : {/*@bgen(jjtree) #Factor(> 1) */
   }
 /*@egen*/ }
 
+// El par\u00e9ntesis se resuelve aqu\u00ed (no en ExpresionRelacional(), ver comentario ah\u00ed)
+// usando Condicion() en vez de Expresion(): '(' es unico entre las alternativas de
+// Base(), asi que no hace falta LOOKAHEAD \u2014 una vez dentro, Condicion() ya cubre
+// tanto una sub-expresion aritmetica agrupada ("(a + b) * 2") como una condicion
+// agrupada ("(a > b) AND c"), sin ambiguedad, porque es un superconjunto estricto.
 void Base() : {}
-{ UnaryMinus() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Expresion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
+{ UnaryMinus() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Condicion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
 
 // Separado de Base() para que el '-' unario si quede marcado en el arbol (nodo propio),
 // sin afectar las demas alternativas de Base(), que siguen delegando de forma transparente.
