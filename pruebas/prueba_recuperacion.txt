@@ -86,8 +86,9 @@ FUN VACIO despuesDeLaRota() {
     IMP "sigo bien";
 }
 
-# Funcion anidada dentro de otra que si tiene su cierre real: dos errores
-# (la anidacion invalida y el ';' faltante que deja), sin arrastrar mas.
+# Funcion anidada dentro de otra que si tiene su cierre real: un solo error
+# (la anidacion invalida); el resto de externa() (su "RET 0;" y su '}' real)
+# se sigue analizando con normalidad, sin arrastrar mas.
 FUN ENT externa() {
     FUN ENT interna() {
         RET 1;

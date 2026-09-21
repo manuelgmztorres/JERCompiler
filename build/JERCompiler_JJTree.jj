@@ -131,6 +131,32 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants/*@e
   }
 
   /**
+   * Recuperacion especifica para el FUN anidado que SentenciaInvalida() tolera una vez como
+   * "basura" dentro de un bloque (ver funComoBasura en Bloque()). A diferencia de
+   * recuperarSentencia(), NO se detiene en un token que luzca como inicio de una sentencia
+   * normal (un tipo de dato, un identificador): lo que sigue a ese FUN es la cabecera de OTRA
+   * funcion completa (tipo de retorno, nombre, parametros), no una sentencia suelta del bloque
+   * actual. Detenerse ahi (como hace recuperarSentencia() v\u00eda esSincronizacionDeSentencia) deja
+   * la cabecera a medio interpretar como si fuera una declaracion de variable ("DEC calcular"
+   * se lee como "DEC calcular;") y dispara una cascada de errores espurios cuando en realidad
+   * el problema real es uno solo: a la funcion anterior le falta su '}' de cierre. Se descarta
+   * la cabecera completa y, si llega a abrir, tambien su cuerpo entero via consumirBloqueSuelto().
+   */
+  void recuperarFunAnidado() {
+    do {
+      Token t = getToken(1);
+      if (t.kind == CIERRE_BLOQUE && llavesDesbalanceadasEnFuncionActual) {
+        ManejadorErrores.reportarDesbalanceDeLlaves(t);
+        throw new AbandonoRecuperacion();
+      }
+      if(t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
+      if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      getNextToken();
+      if(t.kind == FIN_INSTRUCCION) return;
+    } while (true);
+  }
+
+  /**
    * Analiza un bloque '{ ... }' que qued\u00f3 hu\u00e9rfano tras un error. Saltarlo token a token
    * desbalancear\u00eda las llaves y har\u00eda que la '}' del bloque exterior se fugue al nivel global,
    * contaminando todo lo que viene despu\u00e9s.
@@ -878,7 +904,7 @@ void SentenciaInvalida()                    : {/*@bgen(jjtree) SentenciaInvalida
 /*@egen*/
   {
     ManejadorErrores.reportarTokenFueraDeContexto(t, "bloque de sentencias");
-    recuperarSentencia();
+    if (t.kind == FUN) recuperarFunAnidado(); else recuperarSentencia();
   }/*@bgen(jjtree)*/
   } catch (Throwable jjte000) {
     if (jjtc000) {

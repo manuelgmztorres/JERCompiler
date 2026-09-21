@@ -66,6 +66,32 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
   }
 
   /**
+   * Recuperacion especifica para el FUN anidado que SentenciaInvalida() tolera una vez como
+   * "basura" dentro de un bloque (ver funComoBasura en Bloque()). A diferencia de
+   * recuperarSentencia(), NO se detiene en un token que luzca como inicio de una sentencia
+   * normal (un tipo de dato, un identificador): lo que sigue a ese FUN es la cabecera de OTRA
+   * funcion completa (tipo de retorno, nombre, parametros), no una sentencia suelta del bloque
+   * actual. Detenerse ahi (como hace recuperarSentencia() vía esSincronizacionDeSentencia) deja
+   * la cabecera a medio interpretar como si fuera una declaracion de variable ("DEC calcular"
+   * se lee como "DEC calcular;") y dispara una cascada de errores espurios cuando en realidad
+   * el problema real es uno solo: a la funcion anterior le falta su '}' de cierre. Se descarta
+   * la cabecera completa y, si llega a abrir, tambien su cuerpo entero via consumirBloqueSuelto().
+   */
+  void recuperarFunAnidado() {
+    do {
+      Token t = getToken(1);
+      if (t.kind == CIERRE_BLOQUE && llavesDesbalanceadasEnFuncionActual) {
+        ManejadorErrores.reportarDesbalanceDeLlaves(t);
+        throw new AbandonoRecuperacion();
+      }
+      if(t.kind == EOF || t.kind == CIERRE_BLOQUE || t.kind == SINO || t.kind == CUANDO || t.kind == PRED) return;
+      if(t.kind == APERTURA_BLOQUE) { consumirBloqueSuelto(); return; }
+      getNextToken();
+      if(t.kind == FIN_INSTRUCCION) return;
+    } while (true);
+  }
+
+  /**
    * Analiza un bloque '{ ... }' que quedó huérfano tras un error. Saltarlo token a token
    * desbalancearía las llaves y haría que la '}' del bloque exterior se fugue al nivel global,
    * contaminando todo lo que viene después.
@@ -1072,7 +1098,7 @@ jjtree.closeNodeScope(jjtn000, true);
     jjtc000 = false;
     jjtn000.jjtSetLastToken(getToken(0));
 ManejadorErrores.reportarTokenFueraDeContexto(t, "bloque de sentencias");
-    recuperarSentencia();
+    if (t.kind == FUN) recuperarFunAnidado(); else recuperarSentencia();
     } catch (Throwable jjte000) {
 if (jjtc000) {
       jjtree.clearNodeScope(jjtn000);
@@ -2626,6 +2652,42 @@ if (jjtc000) {
     finally { jj_save(18, xla); }
   }
 
+  private boolean jj_3_3()
+ {
+    if (jj_scan_token(CONST)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_null_378_29_16()
+ {
+    if (jj_3R_TipoDato_432_5_17()) return true;
+    return false;
+  }
+
+  private boolean jj_3_15()
+ {
+    if (jj_scan_token(IDENTIFICADOR)) return true;
+    return false;
+  }
+
+  private boolean jj_3_14()
+ {
+    if (jj_scan_token(RET)) return true;
+    return false;
+  }
+
+  private boolean jj_3_13()
+ {
+    if (jj_scan_token(TERMINAR)) return true;
+    return false;
+  }
+
+  private boolean jj_3_12()
+ {
+    if (jj_scan_token(OBT)) return true;
+    return false;
+  }
+
   private boolean jj_3_11()
  {
     if (jj_scan_token(IMP)) return true;
@@ -2656,7 +2718,7 @@ if (jjtc000) {
     xsp = jj_scanpos;
     if (jj_scan_token(15)) {
     jj_scanpos = xsp;
-    if (jj_3R_null_352_29_16()) return true;
+    if (jj_3R_null_378_29_16()) return true;
     }
     return false;
   }
@@ -2685,7 +2747,7 @@ if (jjtc000) {
     return false;
   }
 
-  private boolean jj_3R_TipoDato_410_5_22()
+  private boolean jj_3R_TipoDato_436_5_22()
  {
     if (jj_scan_token(TIPO_BOO)) return true;
     return false;
@@ -2693,17 +2755,17 @@ if (jjtc000) {
 
   private boolean jj_3_4()
  {
-    if (jj_3R_TipoDato_406_5_17()) return true;
+    if (jj_3R_TipoDato_432_5_17()) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_409_5_21()
+  private boolean jj_3R_TipoDato_435_5_21()
  {
     if (jj_scan_token(TIPO_CAR)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_408_5_20()
+  private boolean jj_3R_TipoDato_434_5_20()
  {
     if (jj_scan_token(TIPO_CAD)) return true;
     return false;
@@ -2715,31 +2777,31 @@ if (jjtc000) {
     return false;
   }
 
-  private boolean jj_3R_TipoDato_407_5_19()
+  private boolean jj_3R_TipoDato_433_5_19()
  {
     if (jj_scan_token(TIPO_DEC)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_406_5_18()
+  private boolean jj_3R_TipoDato_432_5_18()
  {
     if (jj_scan_token(TIPO_ENT)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_406_5_17()
+  private boolean jj_3R_TipoDato_432_5_17()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_TipoDato_406_5_18()) {
+    if (jj_3R_TipoDato_432_5_18()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_407_5_19()) {
+    if (jj_3R_TipoDato_433_5_19()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_408_5_20()) {
+    if (jj_3R_TipoDato_434_5_20()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_409_5_21()) {
+    if (jj_3R_TipoDato_435_5_21()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_410_5_22()) return true;
+    if (jj_3R_TipoDato_436_5_22()) return true;
     }
     }
     }
@@ -2763,42 +2825,6 @@ if (jjtc000) {
  {
     if (jj_scan_token(IDENTIFICADOR)) return true;
     if (jj_scan_token(APERTURA_PAREN)) return true;
-    return false;
-  }
-
-  private boolean jj_3_3()
- {
-    if (jj_scan_token(CONST)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_null_352_29_16()
- {
-    if (jj_3R_TipoDato_406_5_17()) return true;
-    return false;
-  }
-
-  private boolean jj_3_15()
- {
-    if (jj_scan_token(IDENTIFICADOR)) return true;
-    return false;
-  }
-
-  private boolean jj_3_14()
- {
-    if (jj_scan_token(RET)) return true;
-    return false;
-  }
-
-  private boolean jj_3_13()
- {
-    if (jj_scan_token(TERMINAR)) return true;
-    return false;
-  }
-
-  private boolean jj_3_12()
- {
-    if (jj_scan_token(OBT)) return true;
     return false;
   }
 
