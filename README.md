@@ -9,17 +9,19 @@ JERCompiler es un analizador léxico y sintáctico desarrollado con JavaCC para 
 CONST DEC PI -> 3.14159;
 ENT edades[3] -> [18, 20, 21];
 DEC notas[2][2] -> [[9.5, 8.0], [7.0, 10.0]];
+ENT contador; # las variables ya no requieren valor inicial
 
-FUN promedio(DEC total, ENT cantidad) {
+FUN DEC promedio(DEC total, ENT cantidad) {
     DEC resultado -> total / cantidad;
     RET resultado;
 }
 
-FUN principal() {
+FUN VACIO principal() {
     ENT indice -> 0;
+    BOO indiceValido -> indice >= 0; # una comparacion tambien es un valor
     notas[indice][1] -> 10.0;
-    SI indice >= 0 {
-        IMP "Índice válido";
+    SI indiceValido { # y una expresion sola tambien es una condicion valida
+        IMP indiceValido;
     } SINO {
         OBT indice;
     }
@@ -30,18 +32,19 @@ FUN principal() {
 * **Tipos de datos:** `ENT` (entero), `DEC` (decimal), `CAD` (cadena), `CAR` (carácter) y `BOO` (booleano).
 * **Operadores de asignación:** `->` (asignación directa), `+->` (suma y asigna), `-->` (resta y asigna).
 * **Operadores aritméticos:** `+`, `-`, `*`, `/`, `%`, `**` (potencia), `//` (raíz cuadrada), `++` (incremento), `--` (decremento).
-* **Comparaciones:** `=` (igualdad), `!=` (diferente), `<`, `<=`, `>`, `>=`.
+* **Comparaciones:** `=` (igualdad), `!=` (diferente), `<`, `<=`, `>`, `>=`. Una comparación (o una combinación con `AND`/`OR`/`NOT`) también es un valor válido para inicializar, reasignar o retornar una variable/función `BOO` — no solo `VERDADERO`/`FALSO`.
 * **Lógica:** `AND`, `OR`, `NOT`.
-* **Control de flujo:** `SI`/`SINO`, `MIENTRAS`, `REPETIR`, `EVALUAR`/`CUANDO`/`PRED`, `TERMINAR`.
-* **Funciones y E/S:** `FUN`, `RET`, `IMP`, `OBT`.
+* **Control de flujo:** `SI`/`SINO`, `MIENTRAS`, `REPETIR`, `EVALUAR`/`CUANDO`/`PRED`, `TERMINAR`. La condición de `SI`/`MIENTRAS`/`REPETIR`/`HACER...MIENTRAS` también acepta una expresión sola (`SI bandera { ... }`), no solo una comparación explícita.
+* **Funciones y E/S:** `FUN` requiere declarar su tipo de retorno antes del nombre (`ENT`/`DEC`/`CAD`/`CAR`/`BOO`, o `VACIO` si no retorna valor), `RET`, `IMP`, `OBT`.
+* **Variables:** `CONST` sigue requiriendo valor inicial; una variable normal puede declararse sin inicializar (`ENT contador;`).
 
 ---
 
 ## Compilación y Ejecución
 
-Todos los comandos se ejecutan **desde la raíz del proyecto** (no dentro de `build\`), para que la tabla de tokens se guarde en `pruebas\tabla_tokens.txt` y no en una copia separada dentro de `build\`.
-
 ### Solo quiero probar archivos (no voy a tocar el código)
+
+Los comandos de esta sección se ejecutan **desde la raíz del proyecto** (no dentro de `build\`), para que la tabla de tokens se guarde en `pruebas\tabla_tokens.txt` y no en una copia separada dentro de `build\`.
 
 El repositorio ya trae las clases compiladas en `build\`. Basta con ejecutar el analizador sobre el archivo que quieras revisar:
 
@@ -53,17 +56,11 @@ Esto imprime los errores léxicos/sintácticos encontrados (si los hay) y actual
 
 ### Voy a modificar el código (gramática o manejador de errores)
 
-Requiere JavaCC instalado (`javacc` en el PATH) y el JDK. Tras cada cambio en `analizador\JERCompiler.jj` o `analizador\ManejadorErrores.java`, hay que regenerar y recompilar antes de ejecutar:
+Desde la migración a JJTree, la gramática fuente es `analizador\JERCompiler_JJTree.jjt` (el antiguo `analizador\JERCompiler.jj` ya no se usa). Regenerar requiere tres pasos, no uno solo — ver `COMPILACION.md` para el detalle completo (por qué son tres pasos, notas de PowerShell, cuándo hace falta borrar los `AST*.java` generados). Resumen, parado en `analizador\`:
 
 ```powershell
-# 1. Regenerar el analizador a partir de la gramática JavaCC
-javacc -OUTPUT_DIRECTORY=build analizador\JERCompiler.jj
-
-# 2. Compilar todas las clases (incluye ManejadorErrores) hacia build\
-javac -encoding UTF-8 -d build build\*.java analizador\ManejadorErrores.java
-
-# 3. Ejecutar sobre un archivo de prueba
-java -cp build JERCompiler pruebas\prueba_valida.txt
+jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
+javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
+javac -d ..\build ..\build\*.java ManejadorErrores.java
+java -cp ..\build JERCompiler ..\pruebas\prueba_valida.txt
 ```
-
-El `-d build` en el paso 2 es importante: sin él, `ManejadorErrores.class` se compila junto a su fuente en `analizador\` en vez de `build\`, y el paso 3 no lo encuentra en el classpath.

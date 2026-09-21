@@ -6,20 +6,20 @@
 # ==========================================
 
 # --- PARTE 1: casos validos ---
-FUN simple() {
+FUN VACIO simple() {
     ENT i -> 0;
     HACER {
         i++;
     } MIENTRAS (i < 5);
 }
 
-FUN condicionCompuesta(ENT x) {
+FUN VACIO condicionCompuesta(ENT x) {
     HACER {
         x --> 1;
     } MIENTRAS (x > 0 AND x != 3);
 }
 
-FUN anidadoConSi(ENT n) {
+FUN VACIO anidadoConSi(ENT n) {
     HACER {
         SI n > 10 {
             n --> 5;
@@ -32,13 +32,13 @@ FUN anidadoConSi(ENT n) {
 # --- PARTE 2: regresion de cascada en la cola de HACER ---
 
 # Falta el bloque '{' tras HACER; la cola MIENTRAS parece valida y se rescata como tal.
-FUN hacerSinBloque(ENT i) {
+FUN VACIO hacerSinBloque(ENT i) {
     HACER
     MIENTRAS (i < 3);
 }
 
 # Falta MIENTRAS tras '}': un solo error, la sentencia siguiente no debe duplicarse.
-FUN hacerSinMientras() {
+FUN VACIO hacerSinMientras() {
     ENT i -> 0;
     HACER {
         i++;
@@ -47,7 +47,7 @@ FUN hacerSinMientras() {
 }
 
 # Falta '(' antes de la condicion.
-FUN hacerSinParentesis() {
+FUN VACIO hacerSinParentesis() {
     ENT i -> 0;
     HACER {
         i++;
@@ -55,7 +55,7 @@ FUN hacerSinParentesis() {
 }
 
 # Falta la condicion (parentesis vacios).
-FUN hacerSinCondicion() {
+FUN VACIO hacerSinCondicion() {
     ENT i -> 0;
     HACER {
         i++;
@@ -63,7 +63,7 @@ FUN hacerSinCondicion() {
 }
 
 # Falta ')' de cierre.
-FUN hacerSinCierreParen() {
+FUN VACIO hacerSinCierreParen() {
     ENT i -> 0;
     HACER {
         i++;
@@ -71,7 +71,7 @@ FUN hacerSinCierreParen() {
 }
 
 # Falta ';' final: la sentencia siguiente no debe duplicarse.
-FUN hacerSinPuntoYComa() {
+FUN VACIO hacerSinPuntoYComa() {
     ENT i -> 0;
     HACER {
         i++;

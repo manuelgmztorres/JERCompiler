@@ -17,7 +17,30 @@ import java.util.*;
  * esto y se elimino; ver el comentario en diagnosticar().
  */
 public final class ManejadorErrores implements JERCompilerConstants {
-  private static final String ARCHIVO_TABLA = "pruebas" + File.separator + "tabla_tokens.txt";
+  private static final String ARCHIVO_TABLA = resolverRutaTabla();
+
+  /**
+   * Calcula la ruta de tabla_tokens.txt de forma independiente del directorio de trabajo
+   * (cwd) desde el que se invoque "java". En vez de usar una ruta relativa "pruebas/..."
+   * (que Java resuelve contra el cwd del proceso, no contra la ubicacion del proyecto),
+   * se ubica el directorio que contiene las clases compiladas (normalmente "build") y se
+   * asume que "pruebas" es una carpeta hermana de ese directorio, en la raiz del proyecto.
+   * Si por algun motivo no se puede determinar (por ejemplo, empaquetado en un .jar), se
+   * hace fallback a la ruta relativa original.
+   */
+  private static String resolverRutaTabla() {
+    try {
+      File origenClases = new File(
+          ManejadorErrores.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+      File raizProyecto = origenClases.isDirectory() ? origenClases.getParentFile() : null;
+      if (raizProyecto != null) {
+        return new File(raizProyecto, "pruebas" + File.separator + "tabla_tokens.txt").getPath();
+      }
+    } catch (Exception ignorada) {
+      // Fallback abajo.
+    }
+    return "pruebas" + File.separator + "tabla_tokens.txt";
+  }
 
   /** Maximo de errores reportados antes de detener el diagnostico. */
   private static final int MAX_ERRORES = 100;
@@ -33,7 +56,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
 
   /** Palabras reservadas de JER, para detectarlas escritas en minusculas. */
   private static final Set<String> RESERVADAS = new HashSet<String>(Arrays.asList(
-    "ENT", "DEC", "CAD", "CAR", "BOO", "CONST", "SI", "SINO", "MIENTRAS", "REPETIR", "HACER",
+    "ENT", "DEC", "CAD", "CAR", "BOO", "VACIO", "CONST", "SI", "SINO", "MIENTRAS", "REPETIR", "HACER",
     "EVALUAR", "CUANDO", "PRED", "TERMINAR", "FUN", "RET", "OBT", "IMP",
     "VERDADERO", "FALSO", "AND", "OR", "NOT"));
 
@@ -331,6 +354,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
       if (anterior.kind == CONST && token.kind == IDENTIFICADOR)
         return alta(token, "CONST requiere un tipo de dato antes del nombre de la constante.", "Se esperaba ENT, DEC, CAD, CAR o BOO.");
 
+      // --- 3h.1: FUN sin tipo de retorno (mensaje distinto al de un parametro/CONST) ---
+      if (anterior.kind == FUN && token.kind == IDENTIFICADOR)
+        return alta(token, "FUN requiere un tipo de retorno antes del nombre de la funcion.", "Se esperaba ENT, DEC, CAD, CAR, BOO o VACIO.");
+
       // --- 3i: Parametro de funcion sin nombre despues del tipo ---
       if (esTipoDato(anterior.kind) && (token.kind == SEPARADOR || token.kind == CIERRE_PAREN))
         return alta(token, "el parametro requiere un nombre despues del tipo '" + anterior.image + "'.", "Se esperaba un identificador.");
@@ -346,7 +373,13 @@ public final class ManejadorErrores implements JERCompilerConstants {
         return alta(token, "operador '" + token.image + "' inesperado; no se permiten operadores relacionales consecutivos.", "Se esperaba un valor entre '" + anterior.image + "' y '" + token.image + "'.");
 
       // --- 3l: Dos valores seguidos sin operador entre ellos (falta un operador, o una llamada sin parentesis) ---
-      if (anterior.kind == IDENTIFICADOR && esInicioDeValor(token.kind))
+      // Unico solape real con la CAPA 4 (falta ';'): esInicioDeValor y esInicioDeSentencia
+      // solo comparten IDENTIFICADOR. Si el identificador que sigue arranca a su vez una
+      // AsignacionOLlamada valida (ver JERCompiler_JJTree.jjt: IDENTIFICADOR seguido de
+      // '->'/'+->'/'-->'/'('/'++'/'--'/'['), no es un valor suelto: es la sentencia siguiente,
+      // a la que solo le falta el ';' anterior. En ese caso se cede el diagnostico a la CAPA 4.
+      if (anterior.kind == IDENTIFICADOR && esInicioDeValor(token.kind)
+          && !(token.kind == IDENTIFICADOR && pareceInicioDeSentenciaNueva(indice)))
         return alta(token, "falta un operador entre '" + anterior.image + "' y '" + token.image + "'.",
           "Si buscaba llamar a una funcion, se escribe '" + anterior.image + "(argumentos)'.");
     }
@@ -531,6 +564,17 @@ public final class ManejadorErrores implements JERCompilerConstants {
   private static boolean esInicioDeValor(int tipo) {
     return tipo == IDENTIFICADOR || tipo == NUMERO_ENTERO || tipo == NUMERO_DECIMAL || tipo == CADENA
       || tipo == CARACTER || tipo == VERDADERO || tipo == FALSO || tipo == APERTURA_PAREN || tipo == APERTURA_CORCHETE;
+  }
+  /**
+   * true si el token en indiceToken es un IDENTIFICADOR seguido de una continuacion valida
+   * de AsignacionOLlamada() ('->', '+->', '-->', '(', '++', '--' o '['): senal de que ese
+   * identificador arranca una sentencia nueva completa, no un valor suelto. Ver CAPA 3l.
+   */
+  private static boolean pareceInicioDeSentenciaNueva(int indiceToken) {
+    if (indiceToken < 0 || indiceToken + 1 >= tabla.size()) return false;
+    int siguiente = tabla.get(indiceToken + 1).kind;
+    return siguiente == ASIGNACION || siguiente == ASIG_INC || siguiente == ASIG_DEC
+      || siguiente == APERTURA_PAREN || siguiente == INC || siguiente == DEC_OP || siguiente == APERTURA_CORCHETE;
   }
   public static boolean esInicioDeSentencia(int tipo) {
     return tipo == CONST || tipo == TIPO_ENT || tipo == TIPO_DEC || tipo == TIPO_CAD || tipo == TIPO_CAR || tipo == TIPO_BOO || tipo == SI || tipo == MIENTRAS || tipo == REPETIR || tipo == EVALUAR || tipo == HACER || tipo == IMP || tipo == OBT || tipo == TERMINAR || tipo == RET || tipo == IDENTIFICADOR;
