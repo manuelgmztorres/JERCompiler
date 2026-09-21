@@ -2,7 +2,9 @@ GRAMÁTICA BNF - JERCompiler
 ===========================
 
 Esta referencia describe la gramática formal y el esquema sintáctico del lenguaje
-general JER implementado en analizador/JERCompiler.jj.
+general JER implementado en analizador/JERCompiler_JJTree.jjt (JJTree; genera el
+AST que usará la fase de análisis semántico). La gramática JavaCC original sin
+JJTree, analizador/JERCompiler.jj, ya no se usa.
 
 PROGRAMA
 --------
@@ -14,23 +16,36 @@ PROGRAMA
 DECLARACIONES Y ARREGLOS
 ------------------------
 
-<DeclaracionVariable>  ::= <TipoDato> IDENTIFICADOR <Dimensiones> '->' <Expresion>
-<DeclaracionConstante> ::= 'CONST' <TipoDato> IDENTIFICADOR <Dimensiones> '->' <Expresion>
+<DeclaracionVariable>  ::= <TipoDato> IDENTIFICADOR <Dimensiones> ( '->' <Condicion> )?
+<DeclaracionConstante> ::= 'CONST' <TipoDato> IDENTIFICADOR <Dimensiones> '->' <Condicion>
 <Dimensiones>          ::= ( '[' <Expresion> ']' )*
 
 <TipoDato> ::= 'ENT' | 'DEC' | 'CAD' | 'CAR' | 'BOO'
 
-Las dimensiones se especifican entre corchetes para arreglos y matrices:
+El inicializador de una variable normal es opcional (una CONST siempre lo exige):
+  ENT contador;                      # sin inicializar
   ENT edades[3] -> [18, 20, 21];
   DEC notas[2][2] -> [[9.5, 8.0], [7.0, 10.0]];
+
+El valor de inicialización es <Condicion>, no solo <Expresion>: una comparación
+(o una combinación con AND/OR/NOT) también es un valor válido, no solo para
+variables BOO — ver la sección CONDICIONES COMO VALOR más abajo.
 
 FUNCIONES Y SENTENCIAS
 ----------------------
 
-<DeclaracionFuncion> ::= 'FUN' IDENTIFICADOR '(' <ListaParametros>? ')' <Bloque>
-<ListaParametros>    ::= <Parametro> ( ',' <Parametro> )*
-<Parametro>          ::= <TipoDato> IDENTIFICADOR
-<Bloque>             ::= '{' <Sentencia>* '}'
+<DeclaracionFuncion> ::= 'FUN' <TipoRetorno> IDENTIFICADOR '(' <ListaParametros>? ')' <Bloque>
+<TipoRetorno>         ::= <TipoDato> | 'VACIO'
+<ListaParametros>     ::= <Parametro> ( ',' <Parametro> )*
+<Parametro>           ::= <TipoDato> IDENTIFICADOR
+<Bloque>              ::= '{' <Sentencia>* '}'
+
+FUN exige declarar su tipo de retorno antes del nombre. 'VACIO' es exclusivo de
+<TipoRetorno> (no es un <TipoDato> válido para variables, constantes ni
+parámetros): marca una función que no retorna valor y por lo tanto no puede
+usarse dentro de una expresión, solo llamarse por su efecto.
+  FUN ENT sumar(ENT a, ENT b) { RET a + b; }
+  FUN VACIO principal() { IMP "hola"; }
 
 <Sentencia> ::= <DeclaracionVariable> ';'
               | <DeclaracionConstante> ';'
@@ -42,17 +57,20 @@ FUNCIONES Y SENTENCIAS
               | <EstructuraHacer>
               | 'IMP' <Expresion> ';'
               | 'OBT' IDENTIFICADOR ';'
-              | 'RET' <Expresion> ';'
+              | 'RET' <Condicion> ';'
               | 'TERMINAR' ';'
 
 <AsignacionOLlamada> ::= IDENTIFICADOR '(' <Argumentos>? ')' ';'
                        | IDENTIFICADOR ( '++' | '--' ) ';'
-                       | IDENTIFICADOR <Acceso>+ ( ( '++' | '--' ) ';' | <OperadorAsignacion> <Expresion> ';' )
-                       | IDENTIFICADOR <OperadorAsignacion> <Expresion> ';'
+                       | IDENTIFICADOR <Acceso>+ ( ( '++' | '--' ) ';' | <OperadorAsignacion> <Condicion> ';' )
+                       | IDENTIFICADOR <OperadorAsignacion> <Condicion> ';'
 
 <OperadorAsignacion> ::= '->' | '+->' | '-->'
 <Acceso>             ::= '[' <Expresion> ']'
 <Argumentos>         ::= <Expresion> ( ',' <Expresion> )*
+
+'RET' y el lado derecho de una asignación ('->', '+->', '-->') también aceptan
+<Condicion> en vez de solo <Expresion> — ver CONDICIONES COMO VALOR.
 
 CONTROL DE FLUJO
 ----------------
@@ -94,11 +112,44 @@ CONTROL DE FLUJO
                          ( 'CUANDO' <Expresion> ':' <Sentencia>* )+
                          ( 'PRED' ':' <Sentencia>* )? '}'
 
+CONDICIONES COMO VALOR
+-----------------------
+
 <Condicion>           ::= <ExpresionLogica>
 <ExpresionLogica>     ::= <ExpresionRelacional> ( ( 'AND' | 'OR' ) <ExpresionRelacional> )*
-<ExpresionRelacional> ::= '(' <ExpresionLogica> ')'
-                        | ( 'NOT' )? <Expresion> <OperadorRelacional> <Expresion>
+<ExpresionRelacional> ::= ( 'NOT' )? <Expresion> ( <OperadorRelacional> <Expresion> )?
 <OperadorRelacional>  ::= '=' | '!=' | '>' | '<' | '>=' | '<='
+
+<Condicion> es un superconjunto estricto de <Expresion>: cualquier cosa que
+<Expresion> puede matchear, <Condicion> también (vía la rama sin comparador de
+<ExpresionRelacional>). Esto habilita dos cosas, deliberadamente simétricas:
+
+1. Una condición (comparación, o combinación con AND/OR/NOT) es un valor válido
+   donde antes solo se aceptaba <Expresion>: inicializador de variable/constante,
+   'RET', y el lado derecho de una asignación. Antes, una variable/función BOO
+   solo podía inicializarse/retornarse/reasignarse con VERDADERO/FALSO u otra
+   variable BOO — nunca con el resultado vivo de una comparación:
+     BOO mayor -> a > b;
+     FUN BOO esPositivo(ENT n) { RET n > 0; }
+
+2. Una expresión sola (sin comparador), como una variable BOO, también es una
+   condición válida por sí misma en SI/MIENTRAS/REPETIR/HACER...MIENTRAS — no
+   hace falta comparar explícitamente:
+     SI bandera { ... }
+     MIENTRAS NOT activo { ... }
+
+Nota de diseño para la fase semántica (aún no implementada): la condición de
+SI/MIENTRAS/REPETIR/HACER debe exigirse de tipo BOO estrictamente — NO se van a
+adoptar semánticas "truthy" (tratar ENT/DEC no-cero como verdadero, al estilo
+C). Sintácticamente cualquier <Expresion> ya es aceptada como condición (ver
+arriba); ese chequeo de tipo queda pendiente, a cargo del analizador semántico.
+
+Los paréntesis para agrupar (tanto aritmética como condiciones) se resuelven en
+<Base>, no aquí — ver EXPRESIONES Y OPERACIONES: <ExpresionRelacional> no tiene
+su propia rama de paréntesis porque, al no vivir dentro de la cadena aritmética
+normal, no puede "seguir" encadenando operadores después de cerrar un grupo
+(p. ej. "(a + b) * 2 / c" como valor de un RET rompía si el paréntesis se
+resolvía a este nivel).
 
 EXPRESIONES Y OPERACIONES
 -------------------------
@@ -108,13 +159,18 @@ EXPRESIONES Y OPERACIONES
 <Factor>         ::= <Base> ( ( '**' | '//' ) <Base> )*
 <Base>           ::= '-' <Base>
                    | IDENTIFICADOR '(' <Argumentos>? ')'
-                   | '(' <Expresion> ')'
+                   | '(' <Condicion> ')'
                    | <LiteralArreglo>
                    | <Valor>
 
 <LiteralArreglo> ::= '[' ( <Expresion> ( ',' <Expresion> )* )? ']'
 <Valor>          ::= NUMERO_ENTERO | NUMERO_DECIMAL | CADENA | CARACTER
                    | 'VERDADERO' | 'FALSO' | IDENTIFICADOR <Acceso>*
+
+'(' en <Base> acepta <Condicion> (no solo <Expresion>): cubre tanto un
+paréntesis puramente aritmético de agrupación ("(a + b) * 2") como una
+condición agrupada ("(a > b) AND c"), sin ambigüedad, porque <Condicion> es
+superconjunto estricto de <Expresion> (ver CONDICIONES COMO VALOR).
 
 LÉXICO Y COMENTARIOS
 --------------------
@@ -182,7 +238,28 @@ que la gramática esperaba en ese punto (nunca por la sola identidad del token).
    en vez de seguir adivinando sentencia por sentencia y atribuir varios
    errores al lugar equivocado.
 
-6. Supresión de diagnósticos derivados: los mensajes genéricos ("token
+6. Un FUN anidado (mal ubicado dentro de un bloque) se tolera UNA vez como
+   sentencia inválida; su recuperación (recuperarFunAnidado) descarta la
+   cabecera completa de esa "otra función" (tipo de retorno, nombre,
+   parámetros) y, si llega a abrir, también su cuerpo entero — a diferencia
+   de la sincronización normal de sentencia, NO se detiene en un tipo de dato
+   o identificador que luzca como inicio de sentencia, porque eso es
+   precisamente la cabecera de la función anidada, no una sentencia suelta
+   del bloque actual (detenerse ahí generaba una cascada de 2-4 errores
+   espurios por cada función que quedaba así de anidada). Un SEGUNDO FUN
+   inmediato ya no se tolera: es señal de que este bloque nunca va a
+   encontrar su '}' real, y se deja que '}' falle con el único diagnóstico
+   del punto 5.
+
+7. Un identificador seguido de otro identificador (p. ej. tras un ';' faltante)
+   es el único solape real entre "faltan dos valores sin operador entre ellos"
+   y "falta ';'/'->' antes de la siguiente sentencia": se desambigua mirando si
+   el segundo identificador arranca a su vez una <AsignacionOLlamada> válida
+   ('->', '+->', '-->', '(', '++', '--' o '['). Si sí, gana el diagnóstico de
+   ';'/'->' faltante (es la sentencia siguiente); si no, gana "falta un
+   operador" (es un valor suelto).
+
+8. Supresión de diagnósticos derivados: los mensajes genéricos ("token
    inesperado", coma o cierre fuera de lugar) se suprimen si aparecen a menos
    de dos tokens del último error ya reportado, evitando que un solo error real
    produzca varios diagnósticos redundantes. Los mensajes específicos (tipo de
