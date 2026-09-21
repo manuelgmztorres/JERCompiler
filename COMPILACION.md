@@ -32,9 +32,10 @@ dentro de `analizador`, apuntando a `..\build` y `..\pruebas`.
 ## Requisitos
 
 - JDK instalado (`javac`, `java` en el PATH).
-- JavaCC/JJTree instalados y accesibles como `jjtree` y `javacc` en el PATH
-  (o, si solo tienes el `.jar`, reemplaza esos comandos por
-  `java -cp javacc.jar jjtree ...` / `java -cp javacc.jar javacc ...`).
+- JavaCC/JJTree: no están instalados como comandos `jjtree`/`javacc` en el
+  PATH. Se usa el jar directamente (`C:\JavaCC\javacc-7.0.13.jar` en esta
+  máquina): `java -cp C:\JavaCC\javacc-7.0.13.jar jjtree ...` /
+  `java -cp C:\JavaCC\javacc-7.0.13.jar javacc ...`.
 
 ## Pasos de compilación
 
@@ -43,7 +44,7 @@ Parado en `JERCompiler\analizador`:
 ### 1. JJTree: traducir `.jjt` a `.jj` anotado
 
 ```powershell
-jjtree "-OUTPUT_DIRECTORY:..\build" JERCompiler_JJTree.jjt
+java -cp C:\JavaCC\javacc-7.0.13.jar jjtree "-OUTPUT_DIRECTORY:..\build" JERCompiler_JJTree.jjt
 ```
 
 Genera en `..\build`:
@@ -62,7 +63,7 @@ Genera en `..\build`:
 ### 2. JavaCC: generar el parser en Java
 
 ```powershell
-javacc "-OUTPUT_DIRECTORY:..\build" ..\build\JERCompiler_JJTree.jj
+java -cp C:\JavaCC\javacc-7.0.13.jar javacc "-OUTPUT_DIRECTORY:..\build" ..\build\JERCompiler_JJTree.jj
 ```
 
 Genera en `..\build` el resto de las clases del parser: `JERCompiler.java`,
@@ -145,8 +146,8 @@ empaqueta algún día en un `.jar`, ese cálculo no aplica y el código hace
 Desde `JERCompiler\analizador`:
 
 ```powershell
-jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
-javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
+java -cp C:\JavaCC\javacc-7.0.13.jar jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
+java -cp C:\JavaCC\javacc-7.0.13.jar javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
 javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
 java -cp ..\build JERCompiler ..\pruebas\prueba_codigo.txt
 ```

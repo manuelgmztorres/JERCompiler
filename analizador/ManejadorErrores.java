@@ -93,9 +93,11 @@ public final class ManejadorErrores implements JERCompilerConstants {
     recolectarTokens(contenido);
     validarComentariosBloque(contenido);
     System.out.println("JERCompiler -- " + nombre);
+    AnalizadorSemantico analizador = null;
     try {
       ASTPrograma raiz = new JERCompiler(new ByteArrayInputStream(contenido)).Programa();
-      new AnalizadorSemantico().analizar(raiz);
+      analizador = new AnalizadorSemantico();
+      analizador.analizar(raiz);
     }
     catch (ParseException e) { reportarError(e); }
     catch (TokenMgrError e) { reportarErrorLexico(e); }
@@ -106,6 +108,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
     System.out.println(JERCompiler.totalErrores == 0 ? "ANALISIS FINALIZADO" : "ANALISIS CON ERRORES");
     System.out.println("--------------------------------------------");
     guardarTabla(nombre);
+    // Solo con 0 errores: una iteracion con errores puede haber dejado la tabla de simbolos a
+    // medio llenar (declaraciones nunca alcanzadas tras un error de sintaxis), y publicarla
+    // igual daria una falsa sensacion de "esto es lo que declaraste" cuando no lo es.
+    if (JERCompiler.totalErrores == 0 && analizador != null) guardarTablaDeTipos(nombre, analizador.obtenerTabla());
   }
 
   private static void reiniciar() {
@@ -763,6 +769,36 @@ public final class ManejadorErrores implements JERCompilerConstants {
       for (RegistroToken registro : tabla)
         writer.printf("%-5d | %-20s | %-28s | %-6d | %d%n", numero++, registro.lexema, registro.tipo, registro.linea, registro.columna);
     } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar la tabla de tokens: " + e.getMessage()); }
+  }
+
+  // ======================= Tabla de tipos =======================
+
+  private static final String ARCHIVO_TABLA_TIPOS = ARCHIVO_TABLA.replace("tabla_tokens.txt", "tabla_tipos.txt");
+
+  private static void guardarTablaDeTipos(String nombreArchivo, TablaSimbolos tabla) {
+    String texto = formatearTablaDeTipos(nombreArchivo, tabla);
+    System.out.println(texto);
+
+    File salida = new File(ARCHIVO_TABLA_TIPOS), directorio = salida.getParentFile(); if (directorio != null && !directorio.exists()) directorio.mkdirs();
+    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(salida), StandardCharsets.UTF_8))) {
+      writer.print(texto);
+    } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar la tabla de tipos: " + e.getMessage()); }
+  }
+
+  private static String formatearTablaDeTipos(String nombreArchivo, TablaSimbolos tabla) {
+    StringWriter buffer = new StringWriter();
+    PrintWriter w = new PrintWriter(buffer);
+    w.println("TABLA DE TIPOS - JERCompiler"); w.println("Archivo: " + nombreArchivo);
+    w.printf("%-20s | %-10s | %-6s | %-6s | %-6s | %s%n", "Nombre", "Categoria", "Tipo", "Aridad", "Linea", "Parametros");
+    w.println("----------------------+------------+--------+--------+--------+------------------------");
+    for (TablaSimbolos.Simbolo simbolo : tabla.todos()) {
+      String parametros = simbolo.tiposParametros == null ? "" : simbolo.tiposParametros.toString();
+      w.printf("%-20s | %-10s | %-6s | %-6d | %-6d | %s%n",
+        simbolo.nombre, descripcionCategoria(simbolo.categoria), simbolo.tipo,
+        simbolo.aridadArreglo, simbolo.declaracion.beginLine, parametros);
+    }
+    w.println("--------------------------------------------");
+    return buffer.toString();
   }
 
   private static String nombreToken(int tipo) {

@@ -41,6 +41,11 @@ public final class TablaSimbolos {
   private final Scope global = new Scope(null);
   private Scope actual = global;
 
+  // Cada scope local (funcion/bloque) se descarta al salir de el (salirScope() solo vuelve al
+  // padre), asi que declarar() tambien copia aqui cada simbolo aceptado, en orden de declaracion,
+  // para poder listar la tabla completa (globales + locales) al final del analisis via todos().
+  private final List<Simbolo> todos = new ArrayList<Simbolo>();
+
   public void entrarScope() { actual = new Scope(actual); }
 
   public void salirScope() {
@@ -58,8 +63,12 @@ public final class TablaSimbolos {
     Simbolo previo = actual.simbolos.get(nuevo.nombre);
     if (previo != null) return previo;
     actual.simbolos.put(nuevo.nombre, nuevo);
+    todos.add(nuevo);
     return null;
   }
+
+  /** Todos los simbolos aceptados durante el analisis (globales y locales), en orden de declaracion. */
+  public List<Simbolo> todos() { return Collections.unmodifiableList(todos); }
 
   /** Busca subiendo por la cadena de scopes hasta el global; null si no existe en ninguno. */
   public Simbolo resolver(String nombre) {

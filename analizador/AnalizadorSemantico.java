@@ -37,6 +37,9 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     raiz.jjtAccept(this, null);
   }
 
+  /** Para reportar la tabla de tipos (ManejadorErrores.guardarTablaDeTipos()) tras un analisis sin errores. */
+  public TablaSimbolos obtenerTabla() { return tabla; }
+
   // ======================= Utilidades de tokens/tipos =======================
 
   private static Token siguiente(Token t) { return t == null ? null : t.next; }
@@ -94,7 +97,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (indice >= n) return; // sin inicializador (variable sin valor; CONST no llega aqui, siempre lo exige)
     Node inicializador = nodo.jjtGetChild(indice);
     TablaSimbolos.TipoDato tipoInicializador = (TablaSimbolos.TipoDato) inicializador.jjtAccept(this, data);
-    if (simbolo != null && tipoInicializador != null && tipoInicializador != simbolo.tipo) {
+    // simbolo.declaracion != idToken: esta declaracion perdio el choque contra una anterior (ya
+    // reportado por declararVariableOConstante) y no es la duena del simbolo en la tabla; comparar
+    // su inicializador contra el tipo de la OTRA declaracion no aporta nada, solo duplica el error.
+    boolean esDuenaDelSimbolo = simbolo != null && simbolo.declaracion == idToken;
+    if (esDuenaDelSimbolo && tipoInicializador != null && tipoInicializador != simbolo.tipo) {
       ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) inicializador).jjtGetFirstToken(), simbolo.tipo, tipoInicializador);
     }
   }
