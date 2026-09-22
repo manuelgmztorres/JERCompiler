@@ -1,18 +1,24 @@
 import java.util.*;
 
 /**
+ * Colaboradores: Manuel Gomez, Luis Eduardo Hernandez Morales, Angel Horacio.
+ *
  * Analizador semantico de dos pasadas sobre el AST que devuelve JERCompiler.Programa().
- * Pasada 1 (registrarDeclaracionesGlobales): recorre solo los hijos directos de ASTPrograma
- * (sin bajar a cuerpos de funcion) y registra variables/constantes/funciones globales en la
- * tabla, para que una funcion pueda llamar a otra declarada mas abajo en el archivo.
- * Pasada 2 (el visitor en si, disparado por el mismo jjtAccept que hace la pasada 1 desde
+ *
+ * Pasada 1 (registrarDeclaracionesGlobales): recorre los hijos directos de ASTPrograma
+ * (sin bajar a cuerpos de funcion) y registra variables, constantes y funciones globales,
+ * para que una funcion pueda llamar a otra declarada mas abajo en el archivo.
+ *
+ * Pasada 2 (el visitor, disparado desde el mismo jjtAccept que arranca la pasada 1 en
  * visit(ASTPrograma)): entra a cada ASTDeclaracionFuncion y revisa su cuerpo.
  *
- * Convencion: el Object que devuelve cada visit() de un nodo de expresion es su
- * TablaSimbolos.TipoDato calculado (la informacion de tipo "sube" por el arbol); el
- * parametro `data` no se usa aun (reservado para contexto hacia abajo, p. ej. el tipo
- * esperado de un literal de arreglo). Los nodos aun no implementados (grupos 2-4) siguen
- * bajando con childrenAccept() para no cortar el recorrido de lo que si esta implementado.
+ * Convencion de retorno: el Object que devuelve cada visit() de un nodo de expresion es su
+ * TablaSimbolos.TipoDato calculado, la informacion de tipo sube por el arbol. El parametro
+ * `data` todavia no se usa: queda reservado para pasar contexto hacia abajo, por ejemplo el
+ * tipo esperado de un literal de arreglo.
+ *
+ * Los nodos sin implementar (grupos 2-4) siguen bajando con childrenAccept(), para no
+ * cortar el recorrido de lo que si esta implementado.
  */
 public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompilerConstants {
 
@@ -32,16 +38,17 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     ContextoTamanioArreglo(int[] tamanios, int nivel, String nombre) { this.tamanios = tamanios; this.nivel = nivel; this.nombre = nombre; }
   }
 
-  // Contexto de la funcion/bucle/caso actual (igual que profundidadFuncion en el parser):
-  // no vive en TablaSimbolos, ver decision-scoping-tabla-simbolos.
+  // Contexto de la funcion/bucle/caso actual, igual que profundidadFuncion en el parser.
+  // No vive en TablaSimbolos, ver decision-scoping-tabla-simbolos.
   private TablaSimbolos.TipoDato tipoRetornoFuncionActual;
   private int profundidadBucle = 0;
   private int profundidadCasoEvaluar = 0;
 
-  // Cuenta cuantos entrarScope() propios (no los de la pasada 1) estan abiertos. Sirve para
-  // que visit(ASTDeclaracionVariable/Constante) sepa si esta dentro de una funcion/bloque
-  // (debe declarar, es una declaracion local real) o a nivel global (NO debe declarar de
-  // nuevo: la pasada 1 ya la registro; aqui solo se sigue bajando por sus hijos).
+  // Cuenta cuantos entrarScope() propios estan abiertos (los de la pasada 1 no cuentan).
+  // Le sirve a visit(ASTDeclaracionVariable/Constante) para saber si esta dentro de una
+  // funcion o bloque, donde debe declarar porque es una declaracion local real, o a nivel
+  // global, donde no debe declarar de nuevo porque la pasada 1 ya la registro y aqui solo
+  // toca seguir bajando por sus hijos.
   private int profundidadAnidamiento = 0;
 
   private void entrarScope() { tabla.entrarScope(); profundidadAnidamiento++; }
@@ -55,7 +62,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   /** Para reportar la tabla de tipos (ManejadorErrores.guardarTablaDeTipos()) tras un analisis sin errores. */
   public TablaSimbolos obtenerTabla() { return tabla; }
 
-  // ======================= Utilidades de tokens/tipos =======================
+  // Utilidades de tokens y tipos
 
   private static Token siguiente(Token t) { return t == null ? null : t.next; }
 
@@ -109,22 +116,24 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
   /**
    * Visita los hijos restantes de una ASTDeclaracionVariable/ASTDeclaracionConstante que
-   * declararVariableOConstante() no toca: el ASTDimensiones (si es arreglo, valida que cada
-   * dimension sea ENT) y el inicializador (si lo hay, compara su tipo contra el tipo declarado
-   * — el hueco que faltaba: antes de esto, "ENT x -> "hola";" no daba ningun error). Resuelve
-   * el tipo declarado desde la tabla de simbolos (ya declarado en este punto, sea localmente por
-   * declararVariableOConstante() o globalmente por la pasada 1) en vez de volver a derivarlo de
-   * los tokens, para no duplicar esa logica en dos lugares que podrian desincronizarse.
+   * declararVariableOConstante() no toca: el ASTDimensiones, si es arreglo valida que cada
+   * dimension sea ENT, y el inicializador, si lo hay compara su tipo contra el tipo declarado.
+   * Ese era el hueco que faltaba: antes de esto, "ENT x -> "hola";" no daba ningun error.
+   *
+   * Resuelve el tipo declarado desde la tabla de simbolos, ya declarado en este punto sea
+   * localmente por declararVariableOConstante() o globalmente por la pasada 1, en vez de
+   * volver a derivarlo de los tokens, para no duplicar esa logica en dos lugares que se
+   * podrian desincronizar.
    */
   private void procesarHijosDeDeclaracion(SimpleNode nodo, boolean esConstante, Object data) {
     Token tipoToken = esConstante ? siguiente(nodo.jjtGetFirstToken()) : nodo.jjtGetFirstToken();
     Token idToken = siguiente(tipoToken);
     if (idToken == null) return; // header roto por un error sintactico ya reportado
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
-    // simbolo.declaracion != idToken: esta declaracion perdio el choque contra una anterior (ya
-    // reportado por declararVariableOConstante) y no es la duena del simbolo en la tabla; comparar
-    // su inicializador contra el tipo (o el tamanio de arreglo) de la OTRA declaracion no aporta
-    // nada, solo duplica el error.
+    // simbolo.declaracion != idToken: esta declaracion perdio el choque contra una anterior,
+    // ya reportado por declararVariableOConstante, y no es la duena del simbolo en la tabla.
+    // Comparar su inicializador contra el tipo (o el tamanio de arreglo) de la otra
+    // declaracion no aporta nada, solo duplica el error.
     boolean esDuenaDelSimbolo = simbolo != null && simbolo.declaracion == idToken;
 
     int n = nodo.jjtGetNumChildren();
@@ -211,13 +220,15 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   /**
-   * EVALUAR no envuelve cada caso CUANDO/PRED en un nodo propio (ver JERCompiler_JJTree.jjt):
-   * la expresion de un CUANDO y las Sentencia() de su cuerpo quedan todas como hermanas directas
-   * de ASTEstructuraEvaluar. Para saber si `actual` es "la expresion de un nuevo CUANDO" o
-   * "una sentencia mas del caso anterior" hay que mirar los tokens crudos entre el fin de
-   * `anterior` y el inicio de `actual`: si aparece un CUANDO o un PRED en el medio, `actual`
-   * empieza un caso nuevo (y ese token dice cual). Devuelve el kind del marcador encontrado, o -1
-   * si no hay ninguno (es una sentencia mas del caso que ya estaba abierto).
+   * EVALUAR no envuelve cada caso CUANDO/PRED en un nodo propio (ver JERCompiler_JJTree.jjt).
+   * La expresion de un CUANDO y las Sentencia() de su cuerpo quedan todas como hermanas
+   * directas de ASTEstructuraEvaluar.
+   *
+   * Para saber si `actual` es la expresion de un CUANDO nuevo o una sentencia mas del caso
+   * anterior, hay que mirar los tokens crudos entre el fin de `anterior` y el inicio de
+   * `actual`: si aparece un CUANDO o un PRED en el medio, `actual` empieza un caso nuevo, y
+   * ese token dice cual. Devuelve el kind del marcador encontrado, o -1 si no hay ninguno
+   * (es una sentencia mas del caso que ya estaba abierto).
    */
   private int marcadorEntre(Node anterior, Node actual) {
     Token t = ((SimpleNode) anterior).jjtGetLastToken().next;
@@ -230,12 +241,14 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   /**
-   * Clave comparable para detectar CUANDO duplicados: solo cuando la expresion del caso es un
-   * literal simple (ASTValorSimple sin hijos, p. ej. no un acceso a arreglo ni una variable) con
-   * un token de tipo ENT/DEC/CAD/CAR/BOO. Un caso con variable o expresion arbitraria (la
-   * gramatica lo permite) no se puede comparar en tiempo de compilacion, asi que se deja pasar
-   * sin marcarlo como visto ni como duplicado. Se antepone el kind del token para no confundir,
-   * p. ej., el CADENA "1" con el NUMERO_ENTERO 1.
+   * Clave comparable para detectar CUANDO duplicados. Solo aplica cuando la expresion del
+   * caso es un literal simple (ASTValorSimple sin hijos, no un acceso a arreglo ni una
+   * variable) con un token de tipo ENT/DEC/CAD/CAR/BOO.
+   *
+   * Un caso con variable o expresion arbitraria, que la gramatica si permite, no se puede
+   * comparar en tiempo de compilacion, asi que se deja pasar sin marcarlo como visto ni
+   * como duplicado. Se antepone el kind del token para no confundir, por ejemplo, el
+   * CADENA "1" con el NUMERO_ENTERO 1.
    */
   private static String valorLiteralDeCaso(Node nodo) {
     if (!(nodo instanceof ASTValorSimple) || nodo.jjtGetNumChildren() != 0) return null;
@@ -251,11 +264,13 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   /**
    * Valida una llamada a funcion: usada como sentencia (ASTAsignacionOLlamada, ignorando el
    * valor de retorno) o como valor (ASTLlamadaFuncion). En ambos casos los argumentos son
-   * directamente los hijos de `nodo`: LlamadaFuncionSinId() es fontaneria, sus Expresion()
-   * resultantes caen directo en el padre, sin nodo propio. Devuelve el tipo de retorno de la
-   * funcion si todo esta bien, o null si hubo algun error (no existe, no es funcion, aridad o
-   * tipos de argumentos incorrectos) — pero siempre visita todos los argumentos igual, para no
-   * perder otros errores que puedan estar dentro de ellos (ver decision-reglas-semanticas-fase1).
+   * directamente los hijos de `nodo`, porque LlamadaFuncionSinId() es fontaneria: sus
+   * Expresion() resultantes caen directo en el padre, sin nodo propio.
+   *
+   * Devuelve el tipo de retorno de la funcion si todo esta bien, o null si hubo algun error
+   * (no existe, no es funcion, aridad o tipos de argumentos incorrectos). Aun asi siempre
+   * visita todos los argumentos, para no perder otros errores que puedan estar dentro de
+   * ellos (ver decision-reglas-semanticas-fase1).
    */
   private TablaSimbolos.TipoDato validarLlamadaFuncion(Token idToken, SimpleNode nodo, Object data) {
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
@@ -284,7 +299,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     return huboError ? null : simbolo.tipo;
   }
 
-  // ======================= Pasada 1: registro global =======================
+  // Pasada 1: registro global
 
   private void registrarDeclaracionesGlobales(ASTPrograma raiz) {
     for (int i = 0; i < raiz.jjtGetNumChildren(); i++) {
@@ -320,7 +335,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (previo != null) ManejadorErrores.reportarSimboloDuplicado(nombreToken, TablaSimbolos.Categoria.FUNCION, previo);
   }
 
-  // ======================= Pasada 2: visitor =======================
+  // Pasada 2: visitor
 
   @Override public Object visit(SimpleNode node, Object data) {
     return node.childrenAccept(this, data);
@@ -388,8 +403,9 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
   /**
    * `true` si la ejecucion de `bloque` (un ASTBloque, o la lista de sentencias de un caso de
-   * EVALUAR) garantiza alcanzar un RET antes de llegar al final. Basta con que UNA sentencia lo
-   * garantice: lo que venga despues seria codigo muerto (hueco aparte, no cubierto aqui).
+   * EVALUAR) garantiza alcanzar un RET antes de llegar al final. Basta con que una sola
+   * sentencia lo garantice: lo que venga despues seria codigo muerto, un hueco aparte que no
+   * se cubre aqui.
    */
   private boolean bloqueSiempreTermina(Node bloque) {
     for (int i = 0; i < bloque.jjtGetNumChildren(); i++) {
@@ -399,12 +415,14 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   /**
-   * `true` si esta sentencia por si sola garantiza terminar en un RET. JER tiene control de flujo
-   * estructurado (sin goto), asi que esto es un predicado recursivo sobre la forma del AST, sin
-   * necesidad de un grafo de flujo real. MIENTRAS/REPETIR siempre son `false` (no se puede
-   * garantizar al menos una iteracion; no se agrega el caso especial de "MIENTRAS VERDADERO"
-   * que si tiene, p. ej., Java, para no ampliar el alcance). TERMINAR tambien es `false`: solo
-   * sale del bucle/EVALUAR, no de la funcion.
+   * `true` si esta sentencia por si sola garantiza terminar en un RET. JER tiene control de
+   * flujo estructurado, sin goto, asi que esto es un predicado recursivo sobre la forma del
+   * AST, sin necesidad de un grafo de flujo real.
+   *
+   * MIENTRAS/REPETIR siempre son `false`, porque no se puede garantizar al menos una
+   * iteracion; no se agrega el caso especial de "MIENTRAS VERDADERO" que si tiene, por
+   * ejemplo, Java, para no ampliar el alcance. TERMINAR tambien es `false`: solo sale del
+   * bucle o del EVALUAR, no de la funcion.
    */
   private boolean sentenciaSiempreTermina(Node sentencia) {
     if (sentencia instanceof ASTSentenciaRetorno) return true;
@@ -416,10 +434,12 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   /**
-   * SI garantiza terminar solo si tiene un SINO final Y todas las ramas (then, cada SINO SI
-   * encadenado, el SINO final) garantizan terminar. Mismo patron de clasificar el primer hijo
-   * por tipo que usa visit(ASTEstructuraSi) para tolerar un header roto por recuperacion de
-   * errores (0, 1, 2 o 3 hijos segun cuanto se pudo recuperar).
+   * SI garantiza terminar solo si tiene un SINO final y todas las ramas (then, cada SINO SI
+   * encadenado, el SINO final) garantizan terminar.
+   *
+   * Usa el mismo patron de clasificar el primer hijo por tipo que visit(ASTEstructuraSi),
+   * para tolerar un header roto por recuperacion de errores (0, 1, 2 o 3 hijos segun cuanto
+   * se pudo recuperar).
    */
   private boolean siSiempreTermina(ASTEstructuraSi node) {
     int n = node.jjtGetNumChildren();
@@ -442,10 +462,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   /**
-   * EVALUAR garantiza terminar solo si tiene PRED (sin el, ningun caso cubre el valor por
-   * defecto) Y cada caso (cada CUANDO + el PRED) garantiza terminar. Reutiliza marcadorEntre()
-   * para agrupar los hijos planos en casos, igual que visit(ASTEstructuraEvaluar) y el chequeo
-   * de CUANDO duplicado.
+   * EVALUAR garantiza terminar solo si tiene PRED, porque sin el ningun caso cubre el valor
+   * por defecto, y cada caso (cada CUANDO mas el PRED) garantiza terminar.
+   *
+   * Reutiliza marcadorEntre() para agrupar los hijos planos en casos, igual que
+   * visit(ASTEstructuraEvaluar) y el chequeo de CUANDO duplicado.
    */
   private boolean evaluarSiempreTermina(ASTEstructuraEvaluar node) {
     int n = node.jjtGetNumChildren();
@@ -530,10 +551,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
   @Override public Object visit(ASTAsignacionOLlamada node, Object data) {
     // El token que sigue al identificador dice, sin ambiguedad, cual de las 4 formas de
-    // AsignacionOLlamada() es esta (ver JERCompiler_JJTree.jjt): '(' = llamada usada como
-    // sentencia; '[' = acceso a arreglo (que a su vez termina en ++/--/asignacion); INC/DEC_OP =
-    // incremento/decremento de un escalar; cualquier otro (ASIGNACION/ASIG_INC/ASIG_DEC) =
-    // asignacion directa a un escalar.
+    // AsignacionOLlamada() es esta (ver JERCompiler_JJTree.jjt).
+    // '(' es una llamada usada como sentencia.
+    // '[' es un acceso a arreglo, que a su vez termina en ++/--/asignacion.
+    // INC/DEC_OP es un incremento o decremento de un escalar.
+    // Cualquier otro (ASIGNACION/ASIG_INC/ASIG_DEC) es una asignacion directa a un escalar.
     Token idToken = node.jjtGetFirstToken();
     Token siguienteToken = siguiente(idToken);
     if (siguienteToken == null) return null; // roto por un error sintactico ya reportado
@@ -549,8 +571,8 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (simbolo.categoria == TablaSimbolos.Categoria.FUNCION) { ManejadorErrores.reportarUsoDeFuncionComoValor(idToken); node.childrenAccept(this, data); return null; }
 
     // Un ASTOperadorAsignacion entre los hijos marca donde termina la lista de indices de
-    // arreglo y empieza el valor asignado; si no aparece ninguno, todos los hijos son indices
-    // y la sentencia termina en ++/-- (0 hijos == "i++;" sin arreglo de por medio).
+    // arreglo y empieza el valor asignado. Si no aparece ninguno, todos los hijos son indices
+    // y la sentencia termina en ++/-- (0 hijos es "i++;" sin arreglo de por medio).
     int indiceOperador = -1;
     for (int i = 0; i < node.jjtGetNumChildren(); i++) {
       if (node.jjtGetChild(i) instanceof ASTOperadorAsignacion) { indiceOperador = i; break; }
@@ -589,14 +611,16 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   @Override public Object visit(ASTOperadorAsignacion node, Object data) { return null; } // fontaneria, sin hijos ni chequeo propio
 
   @Override public Object visit(ASTEstructuraSi node, Object data) {
-    // Si la condicion fallo y la recuperacion no encontro '{', el header entero se descarta y
-    // el nodo puede quedar con menos hijos de los que la gramatica "feliz" sugiere (0, 1, 2 o 3).
-    // Igual que en ASTEstructuraRepetir/Hacer, se clasifica el primer hijo por tipo en vez de
-    // asumir una posicion fija: si NO es un ASTBloque, es la condicion (y en ese caso, por como
-    // esta escrita la gramatica, el ASTBloque "then" siempre le sigue inmediatamente). El tercer
-    // hijo (si existe) puede ser un ASTBloque (SINO simple) o otro ASTEstructuraSi (SINO SI
-    // encadenado); no hace falta distinguirlos, jjtAccept() ya despacha polimorficamente al
-    // visit() correcto sin necesitar instanceof ni node.jjtGetValue().
+    // Si la condicion fallo y la recuperacion no encontro '{', el header entero se descarta
+    // y el nodo puede quedar con menos hijos de los que la gramatica "feliz" sugiere (0, 1,
+    // 2 o 3). Igual que en ASTEstructuraRepetir/Hacer, se clasifica el primer hijo por tipo
+    // en vez de asumir una posicion fija: si no es un ASTBloque, es la condicion, y en ese
+    // caso, por como esta escrita la gramatica, el ASTBloque "then" siempre le sigue
+    // inmediatamente.
+    //
+    // El tercer hijo, si existe, puede ser un ASTBloque (SINO simple) o otro ASTEstructuraSi
+    // (SINO SI encadenado). No hace falta distinguirlos: jjtAccept() ya despacha
+    // polimorficamente al visit() correcto sin necesitar instanceof ni node.jjtGetValue().
     int n = node.jjtGetNumChildren();
     if (n == 0) return null; // header roto sin recuperacion util
     int i = 0;
@@ -630,9 +654,10 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   @Override public Object visit(ASTEstructuraRepetir node, Object data) {
-    // Header roto por un error sintactico puede dejar cualquier subconjunto de estos 4 hijos;
-    // se clasifican por tipo (Condicion() es "lo que no es ninguno de los otros tres", ya que
-    // puede resolver a muchos tipos de nodo distintos y no tiene uno propio identificable).
+    // Header roto por un error sintactico puede dejar cualquier subconjunto de estos 4
+    // hijos, asi que se clasifican por tipo. Condicion() es "lo que no es ninguno de los
+    // otros tres", ya que puede resolver a muchos tipos de nodo distintos y no tiene uno
+    // propio identificable.
     Node declaracion = null, condicion = null, paso = null, cuerpo = null;
     for (int i = 0; i < node.jjtGetNumChildren(); i++) {
       Node hijo = node.jjtGetChild(i);
@@ -789,10 +814,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
   @Override public Object visit(ASTLiteralArreglo node, Object data) {
     // Si `data` trae un contexto de tamanios (ver ContextoTamanioArreglo, hilado desde
-    // procesarHijosDeDeclaracion), compara el numero de elementos de ESTE nivel contra el tamano
-    // declarado (si ese tamano es conocido: no es -1) y arma el contexto del siguiente nivel para
-    // pasarselo a los hijos, en vez de reenviarles el mismo `data` de este nivel. Asi un literal
-    // anidado (arreglo multidimensional) valida cada nivel contra su propia dimension declarada.
+    // procesarHijosDeDeclaracion), compara el numero de elementos de este nivel contra el
+    // tamano declarado, cuando ese tamano es conocido y no es -1, y arma el contexto del
+    // siguiente nivel para pasarselo a los hijos en vez de reenviarles el mismo `data` de
+    // este nivel. Asi un literal anidado (arreglo multidimensional) valida cada nivel contra
+    // su propia dimension declarada.
     ContextoTamanioArreglo ctx = data instanceof ContextoTamanioArreglo ? (ContextoTamanioArreglo) data : null;
     Object dataHijos = null;
     if (ctx != null) {
@@ -808,10 +834,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     boolean huboError = false;
     for (int i = 0; i < node.jjtGetNumChildren(); i++) {
       Node hijo = node.jjtGetChild(i);
-      // Con contexto de tamanios conocido, cada hijo debe ser un sub-arreglo exactamente cuando
-      // quedan mas dimensiones por debajo de este nivel (ctx.tamanios.length > 1); si no coincide
-      // (demasiada profundidad, o el literal se quedo corto), es un error de forma independiente
-      // del error de tamano de arriba (los dos pueden coexistir en el mismo literal).
+      // Con contexto de tamanios conocido, cada hijo debe ser un sub-arreglo exactamente
+      // cuando quedan mas dimensiones por debajo de este nivel (ctx.tamanios.length > 1).
+      // Si no coincide, ya sea demasiada profundidad o el literal se quedo corto, es un
+      // error de forma independiente del error de tamano de arriba: los dos pueden
+      // coexistir en el mismo literal.
       if (ctx != null) {
         boolean esSubArreglo = hijo instanceof ASTLiteralArreglo;
         boolean seEsperaSubArreglo = ctx.tamanios.length > 1;

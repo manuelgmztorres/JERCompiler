@@ -3,18 +3,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
+ * Colaboradores: Manuel Gomez, Luis Eduardo Hernandez Morales, Angel Horacio.
+ *
  * Ejecucion, diagnosticos y tabla de tokens del analizador JER.
  *
- * Principio de diseno para cualquier reporte de error, sintactico o (a futuro) semantico:
- * preferir SIEMPRE un reporte directo con contexto explicito (la gramatica o el chequeo que
- * detecta el problema ya sabe exactamente que paso — ver reportarRetornoFueraFuncion(),
- * reportarColaHacerIncompleta(), reportarCabeceraRepetirIncompleta(), reportarErrorSemantico())
- * en vez de intentar reconstruirlo adivinando desde una excepcion generica. diagnosticar()
- * (el diagnostico por ParseException) es el ultimo recurso, para cuando no hay un chequeo
- * especifico escrito; toda regla ahi que reclame "el token X esta mal ubicado" debe corroborarlo
- * contra expectedTokenSequences (via espera()) antes de afirmarlo — nunca disparar solo por
- * identidad de token. La CAPA 2 original (RET/SINO/CUANDO/PRED por identidad de token) violaba
- * esto y se elimino; ver el comentario en diagnosticar().
+ * Principio de diseno para cualquier reporte de error, sintactico o semantico: preferir
+ * siempre un reporte directo con contexto explicito, ya que la gramatica o el chequeo que
+ * detecta el problema ya sabe exactamente que paso (ver reportarRetornoFueraFuncion(),
+ * reportarColaHacerIncompleta(), reportarCabeceraRepetirIncompleta(), reportarErrorSemantico()),
+ * en vez de intentar reconstruirlo adivinando desde una excepcion generica.
+ *
+ * diagnosticar(), el diagnostico por ParseException, es el ultimo recurso para cuando no hay
+ * un chequeo especifico escrito. Toda regla ahi que reclame "el token X esta mal ubicado" debe
+ * corroborarlo contra expectedTokenSequences (via espera()) antes de afirmarlo, nunca disparar
+ * solo por identidad de token. La Capa 2 original, RET/SINO/CUANDO/PRED por identidad de
+ * token, violaba esto y se elimino; ver el comentario en diagnosticar().
  */
 public final class ManejadorErrores implements JERCompilerConstants {
   private static final String ARCHIVO_TABLA = resolverRutaTabla();
@@ -126,7 +129,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     JERCompiler.reiniciarContadores();
   }
 
-  // ======================= Entradas publicas de reporte =======================
+  // Entradas publicas de reporte
 
   public static void reportarError(ParseException error) { registrar(diagnosticar(error)); }
 
@@ -176,21 +179,21 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Punto de entrada para la futura fase semantica: como reportarRetornoFueraFuncion() o
-   * reportarCabeceraRepetirIncompleta(), un reporte SIEMPRE debe venir con contexto explicito
-   * (linea/columna reales del nodo/token involucrado, detalle concreto) — nunca reconstruido
-   * adivinando desde una excepcion generica. Sin usos todavia: no hay AST ni tabla de simbolos
-   * aun, pero el patron a seguir cuando existan es este.
+   * Punto de entrada generico para reportes semanticos que aun no tienen su propio metodo
+   * dedicado. Igual que reportarRetornoFueraFuncion() o reportarCabeceraRepetirIncompleta(),
+   * el reporte siempre debe venir con contexto explicito (linea y columna reales del
+   * nodo o token involucrado, detalle concreto), nunca reconstruido adivinando desde una
+   * excepcion generica.
    */
   public static void reportarErrorSemantico(int linea, int columna, String detalle, String sugerencia) {
     registrar(new ErrorJER("ERROR SEMANTICO", linea, columna, detalle, sugerencia, true));
   }
 
   /**
-   * Reporte centralizado para TablaSimbolos.declarar(): arma el mensaje segun las categorias en
-   * conflicto (variable/constante/parametro/funcion) en vez de dejar que cada punto de llamada del
-   * futuro visitor semantico redacte su propio texto. tokenNuevo es el identificador que se intento
-   * declarar; previo es el simbolo ya existente en ese mismo scope que devolvio declarar().
+   * Reporte centralizado para TablaSimbolos.declarar(): arma el mensaje segun las categorias
+   * en conflicto (variable, constante, parametro, funcion) en vez de dejar que cada visitor
+   * semantico redacte su propio texto. tokenNuevo es el identificador que se intento declarar;
+   * previo es el simbolo ya existente en ese mismo scope que devolvio declarar().
    */
   public static void reportarSimboloDuplicado(Token tokenNuevo, TablaSimbolos.Categoria categoriaNueva, TablaSimbolos.Simbolo previo) {
     String nombre = tokenNuevo.image;
@@ -399,11 +402,13 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Cuenta el desbalance de '{'/'}' entre el token dado (el propio FUN de una funcion, exclusive)
-   * y el siguiente FUN de nivel global (o EOF). Es una pregunta que SI tiene respuesta cierta
-   * (a diferencia de "cual '{' especifica le falta su '}'", que es ambiguo cuando el conteo no
-   * cuadra) — sirve para decidir si vale la pena seguir intentando recuperar sentencia por
-   * sentencia, o si es mas honesto rendirse con un solo diagnostico.
+   * Cuenta el desbalance de '{'/'}' entre el token dado (el propio FUN de una funcion,
+   * exclusive) y el siguiente FUN de nivel global (o EOF). Es una pregunta que si tiene
+   * respuesta cierta, a diferencia de "cual '{' especifica le falta su '}'", que es ambiguo
+   * cuando el conteo no cuadra.
+   *
+   * Sirve para decidir si vale la pena seguir intentando recuperar sentencia por sentencia,
+   * o si es mas honesto rendirse con un solo diagnostico.
    */
   public static boolean hayDesbalanceDeLlavesEnFuncion(Token inicioFuncion) {
     int indiceInicio = indiceDe(inicioFuncion.beginLine, inicioFuncion.beginColumn);
@@ -430,7 +435,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     return diagnostico == null ? "[ERROR SINTACTICO] Error de sintaxis al final del archivo." : diagnostico.formato();
   }
 
-  // ======================= Diagnostico =======================
+  // Diagnostico
 
   private static ErrorJER diagnosticar(ParseException error) {
     Token token = error.currentToken != null && error.currentToken.next != null ? error.currentToken.next : error.currentToken;
@@ -438,13 +443,13 @@ public final class ManejadorErrores implements JERCompilerConstants {
     Token anterior = error.currentToken;
     int indice = indiceDe(token.beginLine, token.beginColumn);
 
-    // === CAPA 0: Confusiones tipicas de quien viene de C/Java ===
+    // Capa 0: confusiones tipicas de quien viene de C o Java
     if (anterior != null && anterior.kind == IGUAL && token.kind == IGUAL)
       return alta(token, "en JER la comparacion se escribe con un solo '='.", "Se esperaba '=' en lugar de '=='.");
     if (token.kind == IGUAL && (espera(error, ASIGNACION) || espera(error, ASIG_INC) || espera(error, ASIG_DEC)))
       return alta(token, "'=' es el operador de comparacion; para asignar se usa '->'.", "Se esperaba '->' para asignar un valor.");
 
-    // === CAPA 1: Errores lexicos criticos ===
+    // Capa 1: errores lexicos criticos
     if (token.kind == ERROR_LEXICO)
       return new ErrorJER("ERROR LEXICO", token.beginLine, token.beginColumn,
         "caracter no reconocido '" + token.image + "'.", null, true);
@@ -452,29 +457,29 @@ public final class ManejadorErrores implements JERCompilerConstants {
     if (token.kind == CARACTER_INVALIDO) return alta(token, "literal de caracter invalido.", "Se esperaba un unico caracter entre comillas simples.");
     if (token.kind == EOF) return faltante(anterior, token, "fin de archivo inesperado; falta cerrar una instruccion o bloque.", sugerenciaAutomatica(error));
 
-    // CAPA 2 (contexto estructural de RET/SINO/CUANDO/PRED) se elimino: esos 4 casos ya se
-    // reportan por llamada directa desde la gramatica (reportarRetornoFueraFuncion() /
+    // La capa 2 (contexto estructural de RET/SINO/CUANDO/PRED) se elimino: esos 4 casos ya
+    // se reportan por llamada directa desde la gramatica (reportarRetornoFueraFuncion() /
     // reportarTokenFueraDeContexto(), ver SentenciaInvalida()/ElementoGlobalInvalido()/
-    // SentenciaRetorno() en JERCompiler.jj) ANTES de que puedan generar una ParseException real.
-    // Si uno de estos tokens llega aqui, es victima colateral de otra excepcion (p. ej. un bloque
-    // sin cerrar) — CAPA 4 (expectedTokenSequences) ya lo diagnostica correctamente sin adivinar
-    // por identidad de token.
+    // SentenciaRetorno() en JERCompiler.jj) antes de que puedan generar una ParseException
+    // real. Si uno de estos tokens llega aqui, es victima colateral de otra excepcion, por
+    // ejemplo un bloque sin cerrar, y la capa 4 (expectedTokenSequences) ya lo diagnostica
+    // correctamente sin adivinar por identidad de token.
 
-    // === CAPA 2.5: Palabra reservada mal escrita al inicio de la sentencia ===
-    // Va antes de la Capa 3 porque una reservada en minusculas (p. ej. 'si x > 0') tambien
-    // encaja en reglas genericas como "falta un operador"; el diagnostico especifico debe ganar.
+    // Capa 2.5: palabra reservada mal escrita al inicio de la sentencia. Va antes de la
+    // capa 3 porque una reservada en minusculas, por ejemplo 'si x > 0', tambien encaja en
+    // reglas genericas como "falta un operador"; el diagnostico especifico debe ganar.
     ErrorJER reservada = palabraReservadaMalEscrita(indice);
     if (reservada != null) return reservada;
 
-    // === CAPA 3: Diagnosticos por doble factor (token anterior + token actual) ===
+    // Capa 3: diagnosticos por doble factor (token anterior + token actual)
     if (anterior != null) {
-      // --- 3a: Instrucciones de E/S y control incompletas ---
-      // IMP/RET usan esInicioDeValor() (no solo FIN_INSTRUCCION) para cubrir tanto "no habia
-      // nada" (IMP;) como "habia un token que no puede empezar una expresion" (IMP PRED;):
-      // antes, ese segundo caso caia hasta la CAPA 4 generica ("falta un identificador"), que
-      // no explica que en realidad faltaba cualquier expresion, no un identificador puntual.
-      // OBT no necesita este tratamiento: ya tiene su propia regla amplia en 3g (solo acepta
-      // un identificador, nunca un valor/expresion), con su propio mensaje.
+      // 3a: instrucciones de E/S y control incompletas. IMP/RET usan esInicioDeValor(), no
+      // solo FIN_INSTRUCCION, para cubrir tanto "no habia nada" (IMP;) como "habia un token
+      // que no puede empezar una expresion" (IMP PRED;): antes, ese segundo caso caia hasta
+      // la capa 4 generica ("falta un identificador"), que no explica que en realidad
+      // faltaba cualquier expresion, no un identificador puntual. OBT no necesita este
+      // tratamiento: ya tiene su propia regla amplia en 3g (solo acepta un identificador,
+      // nunca un valor o expresion), con su propio mensaje.
       if (anterior.kind == IMP && !esInicioDeValor(token.kind))
         return alta(token, "instruccion IMP incompleta; se esperaba una expresion para imprimir.", "Se esperaba un valor, variable o cadena despues de IMP.");
       if (anterior.kind == OBT && token.kind == FIN_INSTRUCCION)
@@ -484,7 +489,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
       if (anterior.kind == TERMINAR && token.kind != FIN_INSTRUCCION && token.kind != EOF)
         return alta(token, "la instruccion TERMINAR no recibe argumentos; use unicamente 'TERMINAR;'.", "Se esperaba ';'.");
 
-      // --- 3b: Cabeceras de control de flujo vacias ---
+      // 3b: cabeceras de control de flujo vacias
       if (anterior.kind == SI && (token.kind == APERTURA_BLOQUE || esInicioDeSentencia(token.kind)))
         return alta(token, "la estructura SI requiere una condicion antes del bloque '{'.", "Se esperaba una condicion, por ejemplo 'SI x > 0 {'.");
       if (anterior.kind == MIENTRAS && (token.kind == APERTURA_BLOQUE || esInicioDeSentencia(token.kind)))
@@ -492,65 +497,66 @@ public final class ManejadorErrores implements JERCompilerConstants {
       if (anterior.kind == EVALUAR && (token.kind == APERTURA_BLOQUE || esInicioDeSentencia(token.kind)))
         return alta(token, "la estructura EVALUAR requiere la expresion a evaluar antes de '{'.", "Se esperaba una expresion despues de EVALUAR.");
 
-      // --- 3c: Asignaciones incompletas ---
+      // 3c: asignaciones incompletas
       if (anterior.kind == ASIGNACION && token.kind == FIN_INSTRUCCION)
         return alta(token, "asignacion incompleta; falta el valor o expresion a asignar despues de '->'.", "Se esperaba un valor o expresion.");
       if ((anterior.kind == ASIG_INC || anterior.kind == ASIG_DEC) && token.kind == FIN_INSTRUCCION)
         return alta(token, "falta el valor a incrementar/decrementar despues de '" + anterior.image + "'.", "Se esperaba un valor o expresion.");
 
-      // --- 3d: Operadores aritmeticos colgados o dobles ---
+      // 3d: operadores aritmeticos colgados o dobles
       if (esOperadorAritmetico(anterior.kind) && token.kind == FIN_INSTRUCCION)
         return alta(token, "expresion aritmetica incompleta; falta el operando derecho despues de '" + anterior.image + "'.", "Se esperaba un operando.");
       if (esOperadorAritmetico(anterior.kind) && esOperadorAritmetico(token.kind))
         return alta(token, "operador '" + token.image + "' inesperado; no se permiten operadores aritmeticos consecutivos.", "Se esperaba un operando entre '" + anterior.image + "' y '" + token.image + "'.");
 
-      // --- 3e: Conectores logicos colgados ---
+      // 3e: conectores logicos colgados
       if ((anterior.kind == AND || anterior.kind == OR) && (token.kind == FIN_INSTRUCCION || token.kind == APERTURA_BLOQUE))
         return alta(token, "condicion incompleta; falta la expresion despues de '" + anterior.image + "'.", "Se esperaba una comparacion.");
 
-      // --- 3f: Casos CUANDO/PRED ---
+      // 3f: casos CUANDO/PRED
       if (anterior.kind == CUANDO && token.kind == DOS_PUNTOS)
         return alta(token, "el caso CUANDO requiere una expresion o valor a comparar antes de ':'.", "Se esperaba un valor despues de CUANDO.");
 
-      // --- 3g: OBT usado con algo que no es una variable ---
+      // 3g: OBT usado con algo que no es una variable
       if (anterior.kind == OBT && token.kind != IDENTIFICADOR && token.kind != FIN_INSTRUCCION)
         return alta(token, "OBT solo puede leer datos hacia una variable; no admite valores literales ni expresiones.", "Se esperaba un identificador despues de OBT.");
 
-      // --- 3h: CONST sin tipo de dato (mensaje distinto al de un parametro) ---
+      // 3h: CONST sin tipo de dato (mensaje distinto al de un parametro)
       if (anterior.kind == CONST && token.kind == IDENTIFICADOR)
         return alta(token, "CONST requiere un tipo de dato antes del nombre de la constante.", "Se esperaba ENT, DEC, CAD, CAR o BOO.");
 
-      // --- 3h.1: FUN sin tipo de retorno (mensaje distinto al de un parametro/CONST) ---
+      // 3h.1: FUN sin tipo de retorno (mensaje distinto al de un parametro/CONST)
       if (anterior.kind == FUN && token.kind == IDENTIFICADOR)
         return alta(token, "FUN requiere un tipo de retorno antes del nombre de la funcion.", "Se esperaba ENT, DEC, CAD, CAR, BOO o VACIO.");
 
-      // --- 3i: Parametro de funcion sin nombre despues del tipo ---
+      // 3i: parametro de funcion sin nombre despues del tipo
       if (esTipoDato(anterior.kind) && (token.kind == SEPARADOR || token.kind == CIERRE_PAREN))
         return alta(token, "el parametro requiere un nombre despues del tipo '" + anterior.image + "'.", "Se esperaba un identificador.");
 
-      // --- 3j: Coma sobrante al final de una lista (arreglo, argumentos o parametros) ---
+      // 3j: coma sobrante al final de una lista (arreglo, argumentos o parametros)
       if (anterior.kind == SEPARADOR && (token.kind == CIERRE_PAREN || token.kind == CIERRE_CORCHETE))
         return alta(token, "sobra la ',' antes de '" + token.image + "'; no se permite una coma al final de una lista.", "Quite la ',' sobrante.");
 
-      // --- 3k: Operadores relacionales colgados o dobles ---
+      // 3k: operadores relacionales colgados o dobles
       if (esOperadorRelacional(anterior.kind) && token.kind == FIN_INSTRUCCION)
         return alta(token, "condicion incompleta; falta el valor a comparar despues de '" + anterior.image + "'.", "Se esperaba un valor o expresion.");
       if (esOperadorRelacional(anterior.kind) && esOperadorRelacional(token.kind))
         return alta(token, "operador '" + token.image + "' inesperado; no se permiten operadores relacionales consecutivos.", "Se esperaba un valor entre '" + anterior.image + "' y '" + token.image + "'.");
 
-      // --- 3l: Dos valores seguidos sin operador entre ellos (falta un operador, o una llamada sin parentesis) ---
-      // Unico solape real con la CAPA 4 (falta ';'): esInicioDeValor y esInicioDeSentencia
-      // solo comparten IDENTIFICADOR. Si el identificador que sigue arranca a su vez una
-      // AsignacionOLlamada valida (ver JERCompiler_JJTree.jjt: IDENTIFICADOR seguido de
-      // '->'/'+->'/'-->'/'('/'++'/'--'/'['), no es un valor suelto: es la sentencia siguiente,
-      // a la que solo le falta el ';' anterior. En ese caso se cede el diagnostico a la CAPA 4.
+      // 3l: dos valores seguidos sin operador entre ellos (falta un operador, o una llamada
+      // sin parentesis). Unico solape real con la capa 4 (falta ';'): esInicioDeValor y
+      // esInicioDeSentencia solo comparten IDENTIFICADOR. Si el identificador que sigue
+      // arranca a su vez una AsignacionOLlamada valida (ver JERCompiler_JJTree.jjt:
+      // IDENTIFICADOR seguido de '->'/'+->'/'-->'/'('/'++'/'--'/'['), no es un valor suelto:
+      // es la sentencia siguiente, a la que solo le falta el ';' anterior. En ese caso se
+      // cede el diagnostico a la capa 4.
       if (anterior.kind == IDENTIFICADOR && esInicioDeValor(token.kind)
           && !(token.kind == IDENTIFICADOR && pareceInicioDeSentenciaNueva(indice)))
         return alta(token, "falta un operador entre '" + anterior.image + "' y '" + token.image + "'.",
           "Si buscaba llamar a una funcion, se escribe '" + anterior.image + "(argumentos)'.");
     }
 
-    // === CAPA 4: Reglas generales de fallback ===
+    // Capa 4: reglas generales de fallback
     boolean puntoComa = espera(error, FIN_INSTRUCCION);
     boolean asignacion = espera(error, ASIGNACION) || espera(error, ASIG_INC) || espera(error, ASIG_DEC);
     boolean coma = espera(error, SEPARADOR);
@@ -560,7 +566,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
       return alta(token, "falta una expresion dentro de la dimension, el indice o el literal de arreglo.", "Se esperaba un valor o expresion antes de ']'.");
     if (token.kind == IDENTIFICADOR && esperaTipoDato(error))
       return alta(token, "parametro sin tipo de dato; se esperaba ENT, DEC, CAD, CAR o BOO.", "Se esperaba un tipo antes de '" + token.image + "'.");
-    // token nunca es EOF aqui (CAPA 1 ya lo intercepto arriba), asi que siempre hay una imagen util que mostrar.
+    // El token nunca es EOF aqui, la capa 1 ya lo intercepto arriba, asi que siempre hay una imagen util que mostrar.
     if (espera(error, IDENTIFICADOR)) return faltante(anterior, token, "falta un identificador (se encontro '" + token.image + "').", "Se esperaba un nombre de variable o funcion.");
     if (esperaOperadorRelacional(error)) return faltante(anterior, token, "condicion incompleta; falta un operador relacional (=, !=, <, <=, > o >=).", "Se esperaba un operador relacional.");
     if (espera(error, CIERRE_CORCHETE)) return faltante(anterior, token, "falta ']' para cerrar un indice, dimension o literal de arreglo.", "Se esperaba ']'.");
@@ -641,7 +647,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     return nombre.startsWith("<") ? null : "'" + nombre + "'";
   }
 
-  // ======================= Registro y supresion (modo panico) =======================
+  // Registro y supresion (modo panico)
 
   private static ErrorJER alta(Token token, String detalle, String sugerencia) {
     return new ErrorJER("ERROR SINTACTICO", token.beginLine, token.beginColumn, detalle, sugerencia, true);
@@ -650,12 +656,13 @@ public final class ManejadorErrores implements JERCompilerConstants {
     return new ErrorJER("ERROR SINTACTICO", token.beginLine, token.beginColumn, detalle, sugerencia, false);
   }
   /**
-   * Para diagnosticos de algo AUSENTE ("falta ..."): el token donde JavaCC detecto la falla
+   * Para diagnosticos de algo ausente ("falta ..."): el token donde JavaCC detecto la falla
    * suele ser el primer token de la sentencia siguiente, que puede caer varias lineas mas
-   * abajo del lugar real donde faltaba el simbolo. Se reporta sobre el ultimo token valido
-   * (anterior) en su lugar, que es donde el simbolo ausente debia haber ido. Toda regla nueva
-   * que agregue un mensaje "falta X" debe usar este metodo, no alta(), para no reintroducir
-   * el desfase de linea/columna.
+   * abajo del lugar real donde faltaba el simbolo.
+   *
+   * Se reporta sobre el ultimo token valido (anterior) en su lugar, que es donde el simbolo
+   * ausente debia haber ido. Toda regla nueva que agregue un mensaje "falta X" debe usar
+   * este metodo, no alta(), para no reintroducir el desfase de linea/columna.
    */
   private static ErrorJER faltante(Token anterior, Token token, String detalle, String sugerencia) {
     Token referencia = anterior != null ? anterior : token;
@@ -663,8 +670,9 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Descarta duplicados exactos, errores retrogrados producidos al re-parsear, y diagnosticos
-   * genericos que caen a menos de UMBRAL_PANICO tokens del ultimo error realmente reportado.
+   * Descarta duplicados exactos, errores retrogrados producidos al re-parsear, y
+   * diagnosticos genericos que caen a menos de UMBRAL_PANICO tokens del ultimo error
+   * realmente reportado.
    */
   private static void registrar(ErrorJER error) {
     if (error == null || limiteAlcanzado) return;
@@ -699,7 +707,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     }
   }
 
-  // ======================= Utilidades de diagnostico =======================
+  // Utilidades de diagnostico
 
   private static boolean espera(ParseException error, int esperado) {
     if (error.expectedTokenSequences == null) return false;
@@ -734,8 +742,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
   /**
    * true si el token en indiceToken es un IDENTIFICADOR seguido de una continuacion valida
-   * de AsignacionOLlamada() ('->', '+->', '-->', '(', '++', '--' o '['): senal de que ese
-   * identificador arranca una sentencia nueva completa, no un valor suelto. Ver CAPA 3l.
+   * de AsignacionOLlamada() ('->', '+->', '-->', '(', '++', '--' o '['), senal de que ese
+   * identificador arranca una sentencia nueva completa, no un valor suelto. Ver la capa 3l.
    */
   private static boolean pareceInicioDeSentenciaNueva(int indiceToken) {
     if (indiceToken < 0 || indiceToken + 1 >= tabla.size()) return false;
@@ -775,7 +783,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     return cierra > abre ? texto.substring(abre + 1, cierra) : null;
   }
 
-  // ======================= Tabla de tokens =======================
+  // Tabla de tokens
 
   private static long clave(int linea, int columna) { return linea * 100000L + columna; }
 
@@ -813,7 +821,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar la tabla de tokens: " + e.getMessage()); }
   }
 
-  // ======================= Tabla de tipos =======================
+  // Tabla de tipos
 
   private static final String ARCHIVO_TABLA_TIPOS = ARCHIVO_TABLA.replace("tabla_tokens.txt", "tabla_tipos.txt");
 
@@ -851,7 +859,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     return imagen;
   }
 
-  // ======================= Estructuras internas =======================
+  // Estructuras internas
 
   private static final class ErrorJER {
     final String tipo, detalle, sugerencia;
