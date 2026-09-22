@@ -1,5 +1,5 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: ..\pruebas\prueba_luis.txt
+Archivo: pruebas\prueba_luis.txt
 No.   | Lexema               | Token                        | Linea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | FUN                  | FUN                          | 1      | 1
