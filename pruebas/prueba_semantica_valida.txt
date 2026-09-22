@@ -1,0 +1,101 @@
+# ==========================================
+# Prueba semantica: programa que ejercita las reglas de las 4 fases del
+# analizador semantico (tabla de simbolos, tipos, condiciones/control de
+# flujo, asignaciones/llamadas/RET). Debe analizarse con 0 errores.
+# ==========================================
+
+# --- Declaraciones globales: escalares, arreglos, constante ---
+ENT contador -> 0;
+DEC factor -> 1.5;
+CAD etiqueta -> "resultado";
+CAR inicial -> 'J';
+BOO activo -> VERDADERO;
+CONST ENT LIMITE -> 5;
+ENT vector[3] -> [10, 20, 30];
+DEC matriz[2][2] -> [[1.1, 1.2], [2.1, 2.2]];
+
+# --- Llamada hacia adelante: principal() (mas abajo) llama a funciones
+# declaradas despues de ella en el archivo (pasada 1 de registro global). ---
+
+# --- Shadowing valido: el parametro 'contador' oculta al global sin chocar. ---
+FUN ENT incrementar(ENT contador) {
+    RET contador + 1;
+}
+
+FUN BOO esPositivo(ENT n) {
+    RET n > 0;
+}
+
+# --- Concatenacion CAD ('+' con CAD a cualquier lado da CAD) ---
+FUN VACIO imprimirResultado(ENT valor) {
+    IMP etiqueta + ": " + valor;
+}
+
+# --- Condiciones BOO estrictas, NOT, cadena SINO SI, scope por bloque
+# (dos variables 'temp' en ramas hermanas del mismo nombre, sin chocar). ---
+FUN VACIO clasificar(ENT n) {
+    SI n > 90 {
+        ENT temp -> n - 90;
+        IMP temp;
+    } SINO SI n > 50 {
+        ENT temp -> n - 50;
+        IMP temp;
+    } SINO {
+        IMP "bajo";
+    }
+
+    SI NOT esPositivo(n) {
+        IMP "no positivo";
+    }
+}
+
+# --- MIENTRAS, REPETIR (variable de control en su propio scope), HACER,
+# EVALUAR/CUANDO/PRED, TERMINAR dentro de bucle y dentro de un caso EVALUAR. ---
+FUN VACIO controlDeFlujo(ENT limite) {
+    ENT i -> 0;
+    MIENTRAS i < limite {
+        vector[i] -> vector[i] * 2;
+        SI vector[i] > 1000 {
+            TERMINAR;
+        }
+        i++;
+    }
+
+    REPETIR (ENT j -> 0; j < LIMITE; j +-> 1) {
+        IMP j;
+    }
+
+    ENT k -> 0;
+    HACER {
+        k++;
+    } MIENTRAS (k < 3);
+
+    EVALUAR limite {
+        CUANDO 5:
+            IMP "cinco";
+            TERMINAR;
+        CUANDO 10:
+            IMP "diez";
+        PRED:
+            IMP "otro";
+    }
+}
+
+FUN VACIO entradaSalida() {
+    ENT lectura -> 0;
+    OBT lectura;
+    lectura +-> 10;
+    lectura --> 2;
+    IMP lectura;
+}
+
+FUN VACIO principal() {
+    ENT x -> incrementar(contador);
+    IMP x;
+    imprimirResultado(x);
+    clasificar(x);
+    controlDeFlujo(LIMITE);
+    entradaSalida();
+    matriz[0][1] -> factor;
+    activo -> esPositivo(x);
+}

@@ -1,0 +1,194 @@
+# ==========================================
+# Copia de prueba_semantica_valida.txt con errores insertados a proposito,
+# uno por bloque (metodologia igual a prueba_tipado.txt): cada comentario
+# numerado predice el error esperado; se verifica corriendo el compilador
+# y comparando linea por linea contra esta lista.
+# ==========================================
+
+ENT contador -> 0;
+# 1. Duplicado en scope global (namespace unico): 'contador' ya existe arriba.
+# Efecto secundario esperado: como la redeclaracion no reemplaza al simbolo original en la
+# tabla, el chequeo de inicializador de ESTA linea compara su valor (2.0, DEC) contra el tipo
+# del 'contador' ORIGINAL (ENT) -> da un SEGUNDO error en la misma linea (ENT vs DEC), ademas
+# del de "ya declarado". Cascada esperada, no un bug.
+DEC contador -> 2.0;
+
+# 2. Inicializador de tipo incompatible con el tipo declarado (DEC vs CAD).
+DEC factor -> "1.5";
+
+CAD etiqueta -> "resultado";
+CAR inicial -> 'J';
+BOO activo -> VERDADERO;
+CONST ENT LIMITE -> 5;
+
+# 3. Dimension de arreglo que no es ENT.
+ENT vector["tres"] -> [10, 20, 30];
+
+DEC matriz[2][2] -> [[1.1, 1.2], [2.1, 2.2]];
+
+# 4. Parametro duplicado dentro de la misma funcion.
+# Efecto secundario esperado: registrarFirmaFuncion() cuenta los ASTParametro sin importar el
+# choque de nombres, asi que la FIRMA de 'incrementar' queda con 2 parametros (no 1). Esto
+# cambia lo que "numero correcto de argumentos" significa para el resto del archivo: la llamada
+# "valida" de mas abajo (linea ~106, "incrementar(contador)") pasa a estar mal (1 dado, 2
+# esperados), y las mutaciones 19/20 de mas abajo tambien cambian de resultado por esto mismo.
+FUN ENT incrementar(ENT contador, ENT contador) {
+    # 5. Mezcla ENT/DEC sin conversion (contador es ENT, 1.5 es DEC).
+    RET contador + 1.5;
+}
+
+FUN BOO esPositivo(ENT n) {
+    # 6. RET de tipo incompatible con el tipo de retorno de la funcion (BOO esperado, ENT dado).
+    RET n;
+}
+
+FUN VACIO imprimirResultado(ENT valor) {
+    # 7. '-' con CAD: solo '+' concatena, '-' sigue siendo estrictamente aritmetico.
+    IMP etiqueta - ": " + valor;
+}
+
+FUN VACIO clasificar(ENT n) {
+    # 8. Condicion no booleana (n es ENT, no BOO).
+    SI n {
+        ENT temp -> n - 90;
+        IMP temp;
+    } SINO SI n > 50 {
+        ENT temp -> n - 50;
+        IMP temp;
+    } SINO {
+        IMP "bajo";
+    }
+
+    SI NOT esPositivo(n) {
+        # 9. Variable no declarada.
+        IMP noExiste;
+    }
+}
+
+FUN VACIO controlDeFlujo(ENT limite) {
+    ENT i -> 0;
+    MIENTRAS i < limite {
+        vector[i] -> vector[i] * 2;
+        SI vector[i] > 1000 {
+            TERMINAR;
+        }
+        i++;
+    }
+
+    # 10. Paso de REPETIR de tipo incompatible con la variable de control (j es ENT).
+    REPETIR (ENT j -> 0; j < LIMITE; j +-> 1.5) {
+        IMP j;
+    }
+
+    ENT k -> 0;
+    HACER {
+        k++;
+    } MIENTRAS (k < 3);
+
+    EVALUAR limite {
+        CUANDO 5:
+            IMP "cinco";
+            TERMINAR;
+        # 11. Tipo del caso CUANDO incompatible con el tipo de la expresion evaluada (ENT vs CAD).
+        CUANDO "diez":
+            IMP "diez";
+        # 24. CUANDO duplicado: el valor 5 ya aparecio arriba en este mismo EVALUAR.
+        CUANDO 5:
+            IMP "cinco de nuevo";
+        PRED:
+            IMP "otro";
+    }
+}
+
+FUN VACIO entradaSalida() {
+    ENT lectura -> 0;
+    OBT lectura;
+    lectura +-> 10;
+    lectura --> 2;
+    IMP lectura;
+    # 12. OBT hacia una CONST.
+    OBT LIMITE;
+    # 13. OBT hacia un arreglo completo (sin indices).
+    OBT vector;
+    # 14. RET con valor dentro de una funcion VACIO.
+    RET 1;
+}
+
+FUN VACIO principal() {
+    # Esta llamada era valida en prueba_semantica_valida.txt (1 argumento para 1 parametro);
+    # ahora tambien error por el efecto de la mutacion 4 (la firma de 'incrementar' quedo con
+    # 2 parametros). Cascada esperada, documentada aca en vez de en el bloque 4 para que quede
+    # junto al lugar donde realmente aparece.
+    ENT x -> incrementar(contador);
+    IMP x;
+    imprimirResultado(x);
+    clasificar(x);
+    controlDeFlujo(LIMITE);
+    entradaSalida();
+    matriz[0][1] -> factor;
+    activo -> esPositivo(x);
+
+    # 15. TERMINAR fuera de todo bucle/EVALUAR.
+    TERMINAR;
+
+    # 16. Indice de arreglo que no es ENT.
+    IMP vector[etiqueta];
+
+    # 17. Aridad de arreglo incorrecta (vector es 1D, se usan 2 indices).
+    IMP vector[0][0];
+
+    # 18. Reasignar una CONST.
+    LIMITE -> 100;
+
+    # 19. (Ya NO es un error, por el efecto de la mutacion 4): 'incrementar' ahora espera 2
+    # argumentos, asi que llamarla con 2 (ambos ENT) es valido. Se deja para que quede
+    # documentado el porque, no porque haga falta corregirlo.
+    incrementar(1, 2);
+
+    # 20. Tipo de argumento incorrecto, PERO ademas (por la mutacion 4) tambien falta un
+    # argumento: esta linea da 2 errores (numero de argumentos Y tipo del primero).
+    incrementar("texto");
+
+    # 21. Llamar a algo que no es una funcion.
+    contador(1);
+
+    # 22. Usar una funcion VACIO como valor.
+    x -> entradaSalida();
+
+    # 23. '++' sobre un tipo no numerico (etiqueta es CAD).
+    etiqueta++;
+
+    # 25. Tamano de literal de arreglo distinto al tamano declarado (declarado 3, literal con 2).
+    ENT tope[3] -> [1, 2];
+
+    # 26. Profundidad de anidamiento de mas: declarado 1-D, literal anidado en 2 niveles.
+    ENT plano[2] -> [[1, 2], [3, 4]];
+
+    # 27. Profundidad de anidamiento de menos: declarado 2-D, literal plano (sin anidar).
+    DEC matrizMal[2][2] -> [1.0, 2.0];
+
+    # 29. Usar una funcion no-VACIO como valor sin llamarla (le falta "()").
+    activo -> incrementar;
+
+    # 30. Operador de orden (>) entre dos valores no numericos del mismo tipo (CAD).
+    SI etiqueta > "resultado" {
+        IMP "nunca deberia compilar limpio";
+    }
+}
+
+# 28. Funcion no-VACIO donde no todos los caminos terminan en RET (SI sin SINO).
+FUN ENT quizasRetorna(ENT x) {
+    SI x > 0 {
+        RET 1;
+    }
+}
+
+# 31. EVALUAR sin PRED: aunque todos los CUANDO retornen, no cubre el caso por defecto.
+FUN ENT sinPred(ENT n) {
+    EVALUAR n {
+        CUANDO 1:
+            RET 10;
+        CUANDO 2:
+            RET 20;
+    }
+}

@@ -93,7 +93,18 @@ public final class ManejadorErrores implements JERCompilerConstants {
     recolectarTokens(contenido);
     validarComentariosBloque(contenido);
     System.out.println("JERCompiler -- " + nombre);
-    try { new JERCompiler(new ByteArrayInputStream(contenido)).Programa(); }
+    AnalizadorSemantico analizador = null;
+    try {
+      ASTPrograma raiz = new JERCompiler(new ByteArrayInputStream(contenido)).Programa();
+      // El modo panico (ultimoIndiceReportado) solo debe suprimir cascadas DENTRO de la fase
+      // sintactica que acaba de terminar. La fase semantica es un recorrido nuevo, separado, del
+      // AST completo: puede (y suele) reportar errores en tokens anteriores al ultimo error
+      // sintactico visto (p. ej. una declaracion global con tipo incompatible, seguida mas abajo
+      // de un error de sintaxis) y esos NO son una cascada retrograda que haya que descartar.
+      ultimoIndiceReportado = -1;
+      analizador = new AnalizadorSemantico();
+      analizador.analizar(raiz);
+    }
     catch (ParseException e) { reportarError(e); }
     catch (TokenMgrError e) { reportarErrorLexico(e); }
     volcarErrores();
@@ -103,6 +114,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
     System.out.println(JERCompiler.totalErrores == 0 ? "ANALISIS FINALIZADO" : "ANALISIS CON ERRORES");
     System.out.println("--------------------------------------------");
     guardarTabla(nombre);
+    // Solo con 0 errores: una iteracion con errores puede haber dejado la tabla de simbolos a
+    // medio llenar (declaraciones nunca alcanzadas tras un error de sintaxis), y publicarla
+    // igual daria una falsa sensacion de "esto es lo que declaraste" cuando no lo es.
+    if (JERCompiler.totalErrores == 0 && analizador != null) guardarTablaDeTipos(nombre, analizador.obtenerTabla());
   }
 
   private static void reiniciar() {
@@ -169,6 +184,151 @@ public final class ManejadorErrores implements JERCompilerConstants {
    */
   public static void reportarErrorSemantico(int linea, int columna, String detalle, String sugerencia) {
     registrar(new ErrorJER("ERROR SEMANTICO", linea, columna, detalle, sugerencia, true));
+  }
+
+  /**
+   * Reporte centralizado para TablaSimbolos.declarar(): arma el mensaje segun las categorias en
+   * conflicto (variable/constante/parametro/funcion) en vez de dejar que cada punto de llamada del
+   * futuro visitor semantico redacte su propio texto. tokenNuevo es el identificador que se intento
+   * declarar; previo es el simbolo ya existente en ese mismo scope que devolvio declarar().
+   */
+  public static void reportarSimboloDuplicado(Token tokenNuevo, TablaSimbolos.Categoria categoriaNueva, TablaSimbolos.Simbolo previo) {
+    String nombre = tokenNuevo.image;
+    String comoPrevio = descripcionCategoria(previo.categoria);
+    String comoNuevo = descripcionCategoria(categoriaNueva);
+    registrar(new ErrorJER("ERROR SEMANTICO", tokenNuevo.beginLine, tokenNuevo.beginColumn,
+      "'" + nombre + "' ya fue declarado como " + comoPrevio + " en la linea " + previo.declaracion.beginLine
+        + "; no puede declararse de nuevo como " + comoNuevo + " en este mismo scope.",
+      "Use un nombre distinto o elimine la declaracion duplicada.", true));
+  }
+
+  public static void reportarVariableNoDeclarada(Token id) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' no esta declarado en este scope.",
+      "Declarelo antes de usarlo, o revise que el nombre este bien escrito.", true));
+  }
+
+  public static void reportarUsoDeFuncionComoValor(Token id) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' es una funcion; no puede usarse como un valor sin llamarla.",
+      "Se esperaba '" + id.image + "(argumentos)'.", true));
+  }
+
+  /** Dos tipos que debian coincidir (cadena aritmetica, elementos de un literal de arreglo) no coinciden. */
+  public static void reportarTipoIncompatibleEnOperacion(Token token, TablaSimbolos.TipoDato tipoA, TablaSimbolos.TipoDato tipoB) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "tipos incompatibles: " + tipoA + " y " + tipoB + " en la misma operacion.",
+      "JER no convierte tipos automaticamente; use valores del mismo tipo.", true));
+  }
+
+  /** Un operando de +,-,*,/,%,**,// (o el '-' unario) no es ENT ni DEC. */
+  public static void reportarOperandoNoNumerico(Token token, TablaSimbolos.TipoDato tipo) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "el tipo " + tipo + " no admite operadores aritmeticos.",
+      "Los operadores +, -, *, /, %, **, // solo se aplican a ENT o DEC.", true));
+  }
+
+  /** Una dimension de arreglo o un indice de acceso no dio tipo ENT. `contexto` ya viene en minusculas, p. ej. "un indice de arreglo". */
+  public static void reportarExpresionDebeSerEntera(Token token, TablaSimbolos.TipoDato tipo, String contexto) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      contexto + " debe ser de tipo ENT (se encontro " + tipo + ").",
+      "Se esperaba un valor entero.", true));
+  }
+
+  public static void reportarAridadArregloIncorrecta(Token token, String nombre, int usada, int declarada) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' se declaro con " + declarada + " dimension(es), pero se esta accediendo con " + usada + ".",
+      null, true));
+  }
+
+  /** La condicion de SI/MIENTRAS/REPETIR/HACER/una cadena AND-OR no dio tipo BOO (ver decision-condicion-boo-estricta: sin truthy). */
+  public static void reportarCondicionNoBooleana(Token token, TablaSimbolos.TipoDato tipo) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "la condicion debe ser de tipo BOO (se encontro " + tipo + ").",
+      "JER no trata otros tipos como verdadero/falso; use una comparacion o una variable BOO.", true));
+  }
+
+  /** <, <=, > o >= se uso entre dos valores del mismo tipo, pero ese tipo no es ENT ni DEC. */
+  public static void reportarOperadorOrdenNoNumerico(Token token, TablaSimbolos.TipoDato tipo) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "'" + token.image + "' solo compara ENT o DEC (se encontro " + tipo + ").",
+      "Para igualdad entre otros tipos use '=' o '!='.", true));
+  }
+
+  public static void reportarTerminarFueraDeContexto(Token token) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "TERMINAR solo puede usarse dentro de un bucle (MIENTRAS/REPETIR/HACER) o de un caso de EVALUAR.",
+      null, true));
+  }
+
+  /** Se intento llamar (con '(argumentos)') a un simbolo que existe pero no es una funcion. */
+  public static void reportarLlamadaANoFuncion(Token id, TablaSimbolos.Categoria categoriaReal) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' es " + descripcionCategoria(categoriaReal) + "; no se puede llamar como funcion.",
+      null, true));
+  }
+
+  public static void reportarNumeroArgumentosIncorrecto(Token id, String nombre, int dados, int esperados) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + nombre + "' espera " + esperados + " argumento(s), se dieron " + dados + ".",
+      null, true));
+  }
+
+  public static void reportarAsignacionAConstante(Token id, String nombre) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "no se puede modificar '" + nombre + "': es una constante (CONST).",
+      null, true));
+  }
+
+  public static void reportarUsoDeFuncionVacioComoValor(Token id) {
+    registrar(new ErrorJER("ERROR SEMANTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' es VACIO (no retorna ningun valor); no puede usarse dentro de una expresion.",
+      null, true));
+  }
+
+  public static void reportarRetornoConValorEnFuncionVacio(Token token) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "esta funcion es VACIO; RET no puede devolver un valor aqui.",
+      "Quite la sentencia RET completa; una funcion VACIO termina sola al llegar al final del bloque.", true));
+  }
+
+  /** Una funcion no-VACIO tiene al menos un camino de ejecucion que no pasa por un RET. */
+  public static void reportarFuncionSinRetornoGarantizado(Token nombreToken, TablaSimbolos.TipoDato tipoRetorno) {
+    registrar(new ErrorJER("ERROR SEMANTICO", nombreToken.beginLine, nombreToken.beginColumn,
+      "'" + nombreToken.image + "' declara tipo de retorno " + tipoRetorno + ", pero no todos los caminos terminan en un RET.",
+      "Asegurese de que cada rama (SI/SINO, EVALUAR con PRED, etc.) termine en RET, o agregue un RET al final del bloque.", true));
+  }
+
+  /** Dos CUANDO de un mismo EVALUAR comparten el mismo valor literal (solo se detecta entre literales, ver valorLiteralDeCaso()). */
+  public static void reportarCasoDuplicado(Token token, String valor, Token anterior) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "el valor '" + valor + "' ya aparece en un CUANDO anterior (linea " + anterior.beginLine + ").",
+      "Elimine el caso repetido o cambie su valor.", true));
+  }
+
+  /** El literal de arreglo de un nivel de anidamiento no tiene el numero de elementos que su dimension declarada exige. */
+  public static void reportarTamanioArregloIncorrecto(Token token, String nombre, int nivelDimension, int esperado, int encontrado) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' esperaba " + esperado + " elemento(s) en la dimension " + nivelDimension + ", pero el literal tiene " + encontrado + ".",
+      null, true));
+  }
+
+  /** La profundidad de anidamiento del literal en este punto no coincide con las dimensiones declaradas del arreglo. */
+  public static void reportarFormaArregloIncorrecta(Token token, String nombre, int nivel, boolean seEsperabaSubArreglo) {
+    String detalle = seEsperabaSubArreglo
+      ? "'" + nombre + "': en la dimension " + nivel + " se esperaba un sub-arreglo (el arreglo declarado tiene mas dimensiones), pero se encontro un valor simple."
+      : "'" + nombre + "': en la dimension " + nivel + " se encontro un sub-arreglo, pero esa es la ultima dimension declarada (se esperaba un valor simple).";
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn, detalle, null, true));
+  }
+
+  private static String descripcionCategoria(TablaSimbolos.Categoria categoria) {
+    switch (categoria) {
+      case VARIABLE: return "variable";
+      case CONSTANTE: return "constante";
+      case PARAMETRO: return "parametro";
+      case FUNCION: return "funcion";
+      default: return "simbolo";
+    }
   }
 
   public static void reportarBloqueFaltanteHacer(Token hacer, Token siguiente) {
@@ -309,11 +469,17 @@ public final class ManejadorErrores implements JERCompilerConstants {
     // === CAPA 3: Diagnosticos por doble factor (token anterior + token actual) ===
     if (anterior != null) {
       // --- 3a: Instrucciones de E/S y control incompletas ---
-      if (anterior.kind == IMP && token.kind == FIN_INSTRUCCION)
+      // IMP/RET usan esInicioDeValor() (no solo FIN_INSTRUCCION) para cubrir tanto "no habia
+      // nada" (IMP;) como "habia un token que no puede empezar una expresion" (IMP PRED;):
+      // antes, ese segundo caso caia hasta la CAPA 4 generica ("falta un identificador"), que
+      // no explica que en realidad faltaba cualquier expresion, no un identificador puntual.
+      // OBT no necesita este tratamiento: ya tiene su propia regla amplia en 3g (solo acepta
+      // un identificador, nunca un valor/expresion), con su propio mensaje.
+      if (anterior.kind == IMP && !esInicioDeValor(token.kind))
         return alta(token, "instruccion IMP incompleta; se esperaba una expresion para imprimir.", "Se esperaba un valor, variable o cadena despues de IMP.");
       if (anterior.kind == OBT && token.kind == FIN_INSTRUCCION)
         return alta(token, "instruccion OBT incompleta; se esperaba el identificador de la variable a leer.", "Se esperaba un identificador despues de OBT.");
-      if (anterior.kind == RET && token.kind == FIN_INSTRUCCION)
+      if (anterior.kind == RET && !esInicioDeValor(token.kind))
         return alta(token, "instruccion RET incompleta; se esperaba una expresion de retorno.", "Se esperaba un valor o expresion despues de RET.");
       if (anterior.kind == TERMINAR && token.kind != FIN_INSTRUCCION && token.kind != EOF)
         return alta(token, "la instruccion TERMINAR no recibe argumentos; use unicamente 'TERMINAR;'.", "Se esperaba ';'.");
@@ -394,7 +560,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
       return alta(token, "falta una expresion dentro de la dimension, el indice o el literal de arreglo.", "Se esperaba un valor o expresion antes de ']'.");
     if (token.kind == IDENTIFICADOR && esperaTipoDato(error))
       return alta(token, "parametro sin tipo de dato; se esperaba ENT, DEC, CAD, CAR o BOO.", "Se esperaba un tipo antes de '" + token.image + "'.");
-    if (espera(error, IDENTIFICADOR)) return faltante(anterior, token, "falta un identificador.", "Se esperaba un nombre de variable o funcion.");
+    // token nunca es EOF aqui (CAPA 1 ya lo intercepto arriba), asi que siempre hay una imagen util que mostrar.
+    if (espera(error, IDENTIFICADOR)) return faltante(anterior, token, "falta un identificador (se encontro '" + token.image + "').", "Se esperaba un nombre de variable o funcion.");
     if (esperaOperadorRelacional(error)) return faltante(anterior, token, "condicion incompleta; falta un operador relacional (=, !=, <, <=, > o >=).", "Se esperaba un operador relacional.");
     if (espera(error, CIERRE_CORCHETE)) return faltante(anterior, token, "falta ']' para cerrar un indice, dimension o literal de arreglo.", "Se esperaba ']'.");
     if (espera(error, CIERRE_PAREN)) return faltante(anterior, token, "falta ')' para cerrar la expresion o llamada.", "Se esperaba ')'.");
@@ -644,6 +811,36 @@ public final class ManejadorErrores implements JERCompilerConstants {
       for (RegistroToken registro : tabla)
         writer.printf("%-5d | %-20s | %-28s | %-6d | %d%n", numero++, registro.lexema, registro.tipo, registro.linea, registro.columna);
     } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar la tabla de tokens: " + e.getMessage()); }
+  }
+
+  // ======================= Tabla de tipos =======================
+
+  private static final String ARCHIVO_TABLA_TIPOS = ARCHIVO_TABLA.replace("tabla_tokens.txt", "tabla_tipos.txt");
+
+  private static void guardarTablaDeTipos(String nombreArchivo, TablaSimbolos tabla) {
+    String texto = formatearTablaDeTipos(nombreArchivo, tabla);
+    System.out.println(texto);
+
+    File salida = new File(ARCHIVO_TABLA_TIPOS), directorio = salida.getParentFile(); if (directorio != null && !directorio.exists()) directorio.mkdirs();
+    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(salida), StandardCharsets.UTF_8))) {
+      writer.print(texto);
+    } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar la tabla de tipos: " + e.getMessage()); }
+  }
+
+  private static String formatearTablaDeTipos(String nombreArchivo, TablaSimbolos tabla) {
+    StringWriter buffer = new StringWriter();
+    PrintWriter w = new PrintWriter(buffer);
+    w.println("TABLA DE TIPOS - JERCompiler"); w.println("Archivo: " + nombreArchivo);
+    w.printf("%-20s | %-10s | %-6s | %-6s | %-6s | %s%n", "Nombre", "Categoria", "Tipo", "Aridad", "Linea", "Parametros");
+    w.println("----------------------+------------+--------+--------+--------+------------------------");
+    for (TablaSimbolos.Simbolo simbolo : tabla.todos()) {
+      String parametros = simbolo.tiposParametros == null ? "" : simbolo.tiposParametros.toString();
+      w.printf("%-20s | %-10s | %-6s | %-6d | %-6d | %s%n",
+        simbolo.nombre, descripcionCategoria(simbolo.categoria), simbolo.tipo,
+        simbolo.aridadArreglo, simbolo.declaracion.beginLine, parametros);
+    }
+    w.println("--------------------------------------------");
+    return buffer.toString();
   }
 
   private static String nombreToken(int tipo) {

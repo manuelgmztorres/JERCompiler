@@ -58,6 +58,13 @@ options {
   TRACK_TOKENS = true;
   NODE_DEFAULT_VOID = true;
   NODE_PREFIX = "AST";
+  // Carpeta de salida embebida (en vez de pasar -OUTPUT_DIRECTORY en cada invocacion):
+  // relativa al directorio de trabajo desde donde se invoque jjtree/javacc, que por
+  // convencion del proyecto es SIEMPRE la raiz (ver COMPILACION.md). JJTREE_OUTPUT_DIRECTORY
+  // la usa el paso de jjtree; OUTPUT_DIRECTORY la copia jjtree al .jj generado y la usa
+  // despues el paso de javacc.
+  JJTREE_OUTPUT_DIRECTORY = "build";
+  OUTPUT_DIRECTORY = "build";
 }
 
 PARSER_BEGIN(JERCompiler)
@@ -588,6 +595,12 @@ void OperadorAsignacion() #OperadorAsignacion : {}
   <ASIGNACION> | <ASIG_INC> | <ASIG_DEC>
 }
 
+// El tercer hijo (cuando existe) es ambiguo por posicion: puede ser otro ASTEstructuraSi
+// (cadena "SINO SI") o un ASTBloque (rama "SINO" simple), y el AST no lo distingue por sí
+// solo. En vez de que el analizador semantico adivine con instanceof sobre ese hijo, el nodo
+// se etiqueta a si mismo via jjtSetValue()/jjtGetValue() (mecanismo estandar de JJTree, no
+// agrega hijos ni cambia la forma del arbol): null = sin SINO, Boolean.FALSE = SINO con
+// bloque simple, Boolean.TRUE = SINO SI encadenado.
 void EstructuraSi() #EstructuraSi : {}
 {
   <SI>
@@ -602,7 +615,10 @@ void EstructuraSi() #EstructuraSi : {}
   (
     LOOKAHEAD(<SINO>)
     <SINO>
-    ( LOOKAHEAD(<SI>) EstructuraSi() | Bloque(false, false) )
+    (
+        LOOKAHEAD(<SI>) EstructuraSi() { jjtThis.jjtSetValue(Boolean.TRUE); }
+      | Bloque(false, false) { jjtThis.jjtSetValue(Boolean.FALSE); }
+    )
   )?
 }
 
@@ -723,8 +739,14 @@ void ExpresionLogica() #ExpresionLogica(>1) : {}
 // con esa aritmetica una vez que decide que ya termino. Se delega todo parentesis
 // a Base(), que sí vive dentro de la cadena aritmetica normal (Termino/Factor) y
 // puede seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
-void ExpresionRelacional() #ExpresionRelacional(>1) : {}
-{ ( <NOT> )? Expresion() ( OperadorRelacional() Expresion() )? }
+// negado fuerza la creacion del nodo cuando hay NOT, aunque no haya operador relacional
+// (arity == 1): sin esto, "MIENTRAS NOT bandera { ... }" perdia el NOT por completo, porque
+// el nodo nunca llegaba a crearse (el Expresion() unico burbujeaba directo al padre) y NOT,
+// al no tener nodo propio, no queda registrado en ningun lado del arbol. Con negado, el nodo
+// se crea igual (con un solo hijo) y el analizador semantico distingue ese caso por la
+// cantidad de hijos (ver AnalizadorSemantico.visit(ASTExpresionRelacional...)).
+void ExpresionRelacional() #ExpresionRelacional(negado || jjtree.nodeArity() > 1) : { boolean negado = false; }
+{ ( <NOT> { negado = true; } )? Expresion() ( OperadorRelacional() Expresion() )? }
 
 // Nodo propio: unico punto de uso, sin ambiguedad de posicion (ver comentario de diseño).
 void OperadorRelacional() #OperadorRelacional : {}

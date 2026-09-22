@@ -54,15 +54,18 @@ FUN VACIO controlDeFlujo(ENT limite) {
     ENT i -> 0;
     MIENTRAS i < limite AND (activo = FALSO OR contador != 0) {
         vector[i] -> vector[i] * 2;
+        SI vector[i] > 90 {
+            TERMINAR;
+        }
         i++;
     }
     REPETIR (ENT j -> 0; j < 3; j +-> 1) {
         IMP "Repeticion fija";
     }
     SI (limite >= 10 AND NOT limite = 100) {
-        matriz[0][1] -> factorial(4);
+        matriz[0][1] -> factor;
         SI limite = 50 {
-            TERMINAR;
+            IMP "limite es 50";
         }
     } SINO {
         IMP "Fuera de rango";
