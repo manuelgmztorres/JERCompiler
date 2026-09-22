@@ -60,38 +60,39 @@ Reglas que aplica:
 
 **Todo se ejecuta parado en la raíz del proyecto (`JERCompiler\`)** — nunca dentro de `analizador\` ni `build\`. La carpeta de salida (`build\`) y la ruta de `pruebas\tabla_tokens.txt`/`tabla_tipos.txt` están resueltas relativas a ese directorio, así que correr algo desde otro lado produce carpetas duplicadas o rutas rotas (ver el detalle en `COMPILACION.md`).
 
-### `jjtree`/`javacc`: comando corto o forma larga, según la máquina
+### Ejecutar el compilador sobre un archivo
 
-Los comandos de abajo usan `jjtree ...`/`javacc ...` directo. Eso funciona porque esta máquina tiene `C:\javacc\jjtree.bat` y `javacc.bat` en el PATH (cada uno es un one-liner: `java -cp C:\javacc\javacc-7.0.13.jar <jjtree|javacc> %*`). **En una máquina que no tenga esos `.bat`**, o donde JavaCC esté instalado en otro lado, usa la forma larga en su lugar, apuntando al `.jar` real:
+Este es el único comando de ejecución que existe, y es siempre el mismo — no importa si acabas de clonar el repo o si acabas de recompilar algo:
+
+```powershell
+java -cp build JERCompiler pruebas\prueba_valida.txt
+```
+
+Imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `pruebas\tabla_tokens.txt`. Si el archivo compiló con **0 errores**, además imprime en consola y guarda en `pruebas\tabla_tipos.txt` la tabla de símbolos (nombre, categoría, tipo, aridad, línea, parámetros) que armó el analizador semántico — con errores no se publica, porque el análisis pudo haberse cortado a medias (declaraciones nunca alcanzadas) y mostrarla daría una idea equivocada de lo que el programa realmente declara. `pruebas\prueba_semantica_valida.txt` (0 errores esperados) y `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirven como referencia rápida de qué reglas semánticas aplica el analizador.
+
+El repositorio ya trae las clases compiladas en `build\`, así que **si no vas a tocar el código, esto es todo lo que necesitas** — no hace falta nada de lo que sigue abajo.
+
+### Si modificaste código, recompila antes de ejecutar
+
+Los comandos de abajo usan `jjtree ...`/`javacc ...` directo, como si fueran programas instalados — pero JavaCC/JJTree en realidad se distribuyen como un solo `.jar` (`javacc-7.0.13.jar`), sin ningún `jjtree.exe`/`javacc.exe` de por medio. Windows no sabe qué hacer con `jjtree` a secas a menos que exista, en alguna carpeta de tu PATH, un archivo `jjtree.bat` que internamente llame al `.jar` correcto. Ese archivo es un wrapper de una sola línea:
+
+```bat
+@echo off
+java -cp C:\javacc\javacc-7.0.13.jar jjtree %*
+```
+
+(y otro `javacc.bat` igual, cambiando `jjtree` por `javacc`). En esta máquina esos dos `.bat` ya existen en `C:\javacc`, y esa carpeta está en el PATH — por eso `jjtree ...`/`javacc ...` funcionan directo más abajo.
+
+**Es puramente una comodidad, no un requisito.** En cualquier máquina donde esos `.bat` no existan (o donde JavaCC esté instalado en otra ruta), usa siempre la forma larga en su lugar — funciona igual, sin necesidad de crear nada:
 
 ```powershell
 java -cp C:\javacc\javacc-7.0.13.jar jjtree analizador\JERCompiler_JJTree.jjt
 java -cp C:\javacc\javacc-7.0.13.jar javacc build\JERCompiler_JJTree.jj
 ```
 
-(Si quieres los comandos cortos en esa máquina también, crea esos dos `.bat` en alguna carpeta de tu PATH con el mismo contenido.)
+Si quieres los comandos cortos ahí también, crea los dos `.bat` de arriba (ajustando la ruta al `.jar` si está en otro lado) en cualquier carpeta que ya esté en tu PATH.
 
-### Solo quiero probar archivos (no voy a tocar el código)
-
-El repositorio ya trae las clases compiladas en `build\`. Basta con ejecutar el analizador sobre el archivo que quieras revisar:
-
-```powershell
-java -cp build JERCompiler pruebas\prueba_valida.txt
-```
-
-Esto imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `pruebas\tabla_tokens.txt` (y, si el archivo compiló sin errores, `pruebas\tabla_tipos.txt`) con la tabla de tokens/tipos del archivo analizado. `pruebas\prueba_semantica_valida.txt` (0 errores esperados) y `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirven como referencia rápida de qué reglas semánticas aplica el analizador.
-
-### Modifiqué `ManejadorErrores.java`, `TablaSimbolos.java` o `AnalizadorSemantico.java` (no la gramática)
-
-Estos tres son los únicos `.java` que se editan a mano (viven en `analizador\`, junto al `.jjt`, pero no se generan de ahí). No hace falta tocar la gramática ni regenerar nada — alcanza con recompilar:
-
-```powershell
-javac -d build build\*.java analizador\*.java
-```
-
-### Modifiqué la gramática (`analizador\JERCompiler_JJTree.jjt`)
-
-Regenerar requiere tres pasos, no uno solo (ver `COMPILACION.md` para el porqué). La carpeta de salida ya está embebida en el `.jjt`, así que no hace falta pasarla por línea de comandos:
+Cualquier cambio en el código —gramática o los tres `.java` de mano— se recompila corriendo siempre estos tres pasos completos, en este orden: primero los dos que regeneran el parser y el AST a partir de la gramática (`jjtree`, `javacc`), y al final el que compila todo con `javac`. No hace falta decidir si tu cambio "califica" para saltarte algún paso — es más simple y más seguro repetir el proceso completo que arriesgarte a que un paso salteado deje algo desactualizado (`COMPILACION.md` documenta qué pasos se pueden omitir en casos específicos, para quien quiera optimizarlo):
 
 ```powershell
 jjtree analizador\JERCompiler_JJTree.jjt
@@ -99,13 +100,4 @@ javacc build\JERCompiler_JJTree.jj
 javac -d build build\*.java analizador\*.java
 ```
 
-**Antes de correr esto, revisa qué tipo de cambio hiciste** — JJTree **no regenera** un `AST*.java` (ni `SimpleNode.java`) si ya existe en `build\`, precisamente para que puedas editarlos a mano sin que una corrida nueva los pise:
-
-- **Tu cambio NO agrega, quita ni renombra ningún nodo anotado con `#Nombre`** (p. ej. solo cambiaste *cuándo* se crea un nodo que ya existía, como el caso de `ExpresionRelacional` con `NOT`): los tres pasos de arriba, tal cual, son suficientes.
-- **Tu cambio SÍ agrega, quita o renombra un nodo:** borra primero el/los `AST*.java` afectados (y `SimpleNode.java` si aplica) de `build\` — si no, JJTree deja el archivo viejo intacto y tu cambio no se refleja — y luego corre los tres pasos.
-
-Para probar el resultado con cualquiera de los dos flujos de arriba:
-
-```powershell
-java -cp build JERCompiler pruebas\prueba_valida.txt
-```
+Después de cualquiera de los dos casos de arriba, vuelve a **"Ejecutar el compilador sobre un archivo"** para probar el resultado.
