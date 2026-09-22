@@ -1,9 +1,38 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_tabla_simbolos.txt
+Archivo: pruebas/prueba_valida.txt
 Nombre               | Categoria  | Tipo   | Aridad | Linea  | Parametros
 ----------------------+------------+--------+--------+--------+------------------------
-hola                 | variable   | CAD    | 0      | 1      | 
-mundo                | variable   | CAD    | 0      | 2      | 
-pruebaFuncion        | funcion    | VACIO  | 0      | 4      | []
-bandera              | variable   | BOO    | 0      | 5      | 
+PI                   | constante  | DEC    | 0      | 7      | 
+SALUDO               | constante  | CAD    | 0      | 8      | 
+MODO_DEBUG           | constante  | BOO    | 0      | 9      | 
+contador             | variable   | ENT    | 0      | 11     | 
+factor               | variable   | DEC    | 0      | 12     | 
+mensaje              | variable   | CAD    | 0      | 13     | 
+letra                | variable   | CAR    | 0      | 14     | 
+activo               | variable   | BOO    | 0      | 15     | 
+vector               | variable   | ENT    | 1      | 17     | 
+matriz               | variable   | DEC    | 2      | 18     | 
+factorial            | funcion    | ENT    | 0      | 21     | [ENT]
+calcular             | funcion    | DEC    | 0      | 30     | [DEC, DEC]
+evaluarNota          | funcion    | VACIO  | 0      | 38     | [ENT]
+controlDeFlujo       | funcion    | VACIO  | 0      | 53     | [ENT]
+entradaSalida        | funcion    | VACIO  | 0      | 76     | []
+contarHastaCero      | funcion    | VACIO  | 0      | 86     | [ENT]
+clasificar           | funcion    | VACIO  | 0      | 95     | [ENT]
+principal            | funcion    | ENT    | 0      | 107    | []
+n                    | parametro  | ENT    | 0      | 21     | 
+base                 | parametro  | DEC    | 0      | 30     | 
+exponente            | parametro  | DEC    | 0      | 30     | 
+potencia             | variable   | DEC    | 0      | 31     | 
+raiz                 | variable   | DEC    | 0      | 32     | 
+residuo              | variable   | DEC    | 0      | 33     | 
+nota                 | parametro  | ENT    | 0      | 38     | 
+limite               | parametro  | ENT    | 0      | 53     | 
+i                    | variable   | ENT    | 0      | 54     | 
+j                    | variable   | ENT    | 0      | 62     | 
+lectura              | variable   | ENT    | 0      | 77     | 
+inicio               | parametro  | ENT    | 0      | 86     | 
+i                    | variable   | ENT    | 0      | 87     | 
+nota                 | parametro  | ENT    | 0      | 95     | 
+resultado            | variable   | DEC    | 0      | 111    | 
 --------------------------------------------

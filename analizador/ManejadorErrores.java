@@ -292,6 +292,35 @@ public final class ManejadorErrores implements JERCompilerConstants {
       "Quite la sentencia RET completa; una funcion VACIO termina sola al llegar al final del bloque.", true));
   }
 
+  /** Una funcion no-VACIO tiene al menos un camino de ejecucion que no pasa por un RET. */
+  public static void reportarFuncionSinRetornoGarantizado(Token nombreToken, TablaSimbolos.TipoDato tipoRetorno) {
+    registrar(new ErrorJER("ERROR SEMANTICO", nombreToken.beginLine, nombreToken.beginColumn,
+      "'" + nombreToken.image + "' declara tipo de retorno " + tipoRetorno + ", pero no todos los caminos terminan en un RET.",
+      "Asegurese de que cada rama (SI/SINO, EVALUAR con PRED, etc.) termine en RET, o agregue un RET al final del bloque.", true));
+  }
+
+  /** Dos CUANDO de un mismo EVALUAR comparten el mismo valor literal (solo se detecta entre literales, ver valorLiteralDeCaso()). */
+  public static void reportarCasoDuplicado(Token token, String valor, Token anterior) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "el valor '" + valor + "' ya aparece en un CUANDO anterior (linea " + anterior.beginLine + ").",
+      "Elimine el caso repetido o cambie su valor.", true));
+  }
+
+  /** El literal de arreglo de un nivel de anidamiento no tiene el numero de elementos que su dimension declarada exige. */
+  public static void reportarTamanioArregloIncorrecto(Token token, String nombre, int nivelDimension, int esperado, int encontrado) {
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' esperaba " + esperado + " elemento(s) en la dimension " + nivelDimension + ", pero el literal tiene " + encontrado + ".",
+      null, true));
+  }
+
+  /** La profundidad de anidamiento del literal en este punto no coincide con las dimensiones declaradas del arreglo. */
+  public static void reportarFormaArregloIncorrecta(Token token, String nombre, int nivel, boolean seEsperabaSubArreglo) {
+    String detalle = seEsperabaSubArreglo
+      ? "'" + nombre + "': en la dimension " + nivel + " se esperaba un sub-arreglo (el arreglo declarado tiene mas dimensiones), pero se encontro un valor simple."
+      : "'" + nombre + "': en la dimension " + nivel + " se encontro un sub-arreglo, pero esa es la ultima dimension declarada (se esperaba un valor simple).";
+    registrar(new ErrorJER("ERROR SEMANTICO", token.beginLine, token.beginColumn, detalle, null, true));
+  }
+
   private static String descripcionCategoria(TablaSimbolos.Categoria categoria) {
     switch (categoria) {
       case VARIABLE: return "variable";
@@ -440,11 +469,17 @@ public final class ManejadorErrores implements JERCompilerConstants {
     // === CAPA 3: Diagnosticos por doble factor (token anterior + token actual) ===
     if (anterior != null) {
       // --- 3a: Instrucciones de E/S y control incompletas ---
-      if (anterior.kind == IMP && token.kind == FIN_INSTRUCCION)
+      // IMP/RET usan esInicioDeValor() (no solo FIN_INSTRUCCION) para cubrir tanto "no habia
+      // nada" (IMP;) como "habia un token que no puede empezar una expresion" (IMP PRED;):
+      // antes, ese segundo caso caia hasta la CAPA 4 generica ("falta un identificador"), que
+      // no explica que en realidad faltaba cualquier expresion, no un identificador puntual.
+      // OBT no necesita este tratamiento: ya tiene su propia regla amplia en 3g (solo acepta
+      // un identificador, nunca un valor/expresion), con su propio mensaje.
+      if (anterior.kind == IMP && !esInicioDeValor(token.kind))
         return alta(token, "instruccion IMP incompleta; se esperaba una expresion para imprimir.", "Se esperaba un valor, variable o cadena despues de IMP.");
       if (anterior.kind == OBT && token.kind == FIN_INSTRUCCION)
         return alta(token, "instruccion OBT incompleta; se esperaba el identificador de la variable a leer.", "Se esperaba un identificador despues de OBT.");
-      if (anterior.kind == RET && token.kind == FIN_INSTRUCCION)
+      if (anterior.kind == RET && !esInicioDeValor(token.kind))
         return alta(token, "instruccion RET incompleta; se esperaba una expresion de retorno.", "Se esperaba un valor o expresion despues de RET.");
       if (anterior.kind == TERMINAR && token.kind != FIN_INSTRUCCION && token.kind != EOF)
         return alta(token, "la instruccion TERMINAR no recibe argumentos; use unicamente 'TERMINAR;'.", "Se esperaba ';'.");
@@ -525,7 +560,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
       return alta(token, "falta una expresion dentro de la dimension, el indice o el literal de arreglo.", "Se esperaba un valor o expresion antes de ']'.");
     if (token.kind == IDENTIFICADOR && esperaTipoDato(error))
       return alta(token, "parametro sin tipo de dato; se esperaba ENT, DEC, CAD, CAR o BOO.", "Se esperaba un tipo antes de '" + token.image + "'.");
-    if (espera(error, IDENTIFICADOR)) return faltante(anterior, token, "falta un identificador.", "Se esperaba un nombre de variable o funcion.");
+    // token nunca es EOF aqui (CAPA 1 ya lo intercepto arriba), asi que siempre hay una imagen util que mostrar.
+    if (espera(error, IDENTIFICADOR)) return faltante(anterior, token, "falta un identificador (se encontro '" + token.image + "').", "Se esperaba un nombre de variable o funcion.");
     if (esperaOperadorRelacional(error)) return faltante(anterior, token, "condicion incompleta; falta un operador relacional (=, !=, <, <=, > o >=).", "Se esperaba un operador relacional.");
     if (espera(error, CIERRE_CORCHETE)) return faltante(anterior, token, "falta ']' para cerrar un indice, dimension o literal de arreglo.", "Se esperaba ']'.");
     if (espera(error, CIERRE_PAREN)) return faltante(anterior, token, "falta ')' para cerrar la expresion o llamada.", "Se esperaba ')'.");

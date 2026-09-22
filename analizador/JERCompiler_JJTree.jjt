@@ -58,6 +58,13 @@ options {
   TRACK_TOKENS = true;
   NODE_DEFAULT_VOID = true;
   NODE_PREFIX = "AST";
+  // Carpeta de salida embebida (en vez de pasar -OUTPUT_DIRECTORY en cada invocacion):
+  // relativa al directorio de trabajo desde donde se invoque jjtree/javacc, que por
+  // convencion del proyecto es SIEMPRE la raiz (ver COMPILACION.md). JJTREE_OUTPUT_DIRECTORY
+  // la usa el paso de jjtree; OUTPUT_DIRECTORY la copia jjtree al .jj generado y la usa
+  // despues el paso de javacc.
+  JJTREE_OUTPUT_DIRECTORY = "build";
+  OUTPUT_DIRECTORY = "build";
 }
 
 PARSER_BEGIN(JERCompiler)

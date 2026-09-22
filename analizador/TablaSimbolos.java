@@ -23,12 +23,16 @@ public final class TablaSimbolos {
     public final int aridadArreglo;               // 0 = escalar
     public final List<TipoDato> tiposParametros;   // solo si categoria == FUNCION; null en otro caso
     public final Token declaracion;                // para linea/columna en diagnosticos
+    // Tamano literal de cada dimension (longitud == aridadArreglo), o -1 en una posicion cuando
+    // esa dimension no es un literal ENT (variable/expresion dinamica: no se puede saber su
+    // tamano en tiempo de compilacion). null cuando aridadArreglo == 0 (escalar).
+    public final int[] tamanios;
 
     public Simbolo(String nombre, Categoria categoria, TipoDato tipo, int aridadArreglo,
-                    List<TipoDato> tiposParametros, Token declaracion) {
+                    List<TipoDato> tiposParametros, Token declaracion, int[] tamanios) {
       this.nombre = nombre; this.categoria = categoria; this.tipo = tipo;
       this.aridadArreglo = aridadArreglo; this.tiposParametros = tiposParametros;
-      this.declaracion = declaracion;
+      this.declaracion = declaracion; this.tamanios = tamanios;
     }
   }
 

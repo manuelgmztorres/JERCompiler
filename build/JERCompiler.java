@@ -2671,12 +2671,6 @@ if (jjtc000) {
     finally { jj_save(17, xla); }
   }
 
-  private boolean jj_3_3()
- {
-    if (jj_scan_token(CONST)) return true;
-    return false;
-  }
-
   private boolean jj_3_18()
  {
     if (jj_scan_token(IDENTIFICADOR)) return true;
@@ -2684,9 +2678,9 @@ if (jjtc000) {
     return false;
   }
 
-  private boolean jj_3R_null_378_29_16()
+  private boolean jj_3R_null_385_29_16()
  {
-    if (jj_3R_TipoDato_432_5_17()) return true;
+    if (jj_3R_TipoDato_439_5_17()) return true;
     return false;
   }
 
@@ -2744,7 +2738,7 @@ if (jjtc000) {
     xsp = jj_scanpos;
     if (jj_scan_token(15)) {
     jj_scanpos = xsp;
-    if (jj_3R_null_378_29_16()) return true;
+    if (jj_3R_null_385_29_16()) return true;
     }
     return false;
   }
@@ -2779,7 +2773,7 @@ if (jjtc000) {
     return false;
   }
 
-  private boolean jj_3R_TipoDato_436_5_22()
+  private boolean jj_3R_TipoDato_443_5_22()
  {
     if (jj_scan_token(TIPO_BOO)) return true;
     return false;
@@ -2787,47 +2781,47 @@ if (jjtc000) {
 
   private boolean jj_3_4()
  {
-    if (jj_3R_TipoDato_432_5_17()) return true;
+    if (jj_3R_TipoDato_439_5_17()) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_435_5_21()
+  private boolean jj_3R_TipoDato_442_5_21()
  {
     if (jj_scan_token(TIPO_CAR)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_434_5_20()
+  private boolean jj_3R_TipoDato_441_5_20()
  {
     if (jj_scan_token(TIPO_CAD)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_433_5_19()
+  private boolean jj_3R_TipoDato_440_5_19()
  {
     if (jj_scan_token(TIPO_DEC)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_432_5_18()
+  private boolean jj_3R_TipoDato_439_5_18()
  {
     if (jj_scan_token(TIPO_ENT)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_432_5_17()
+  private boolean jj_3R_TipoDato_439_5_17()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_TipoDato_432_5_18()) {
+    if (jj_3R_TipoDato_439_5_18()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_433_5_19()) {
+    if (jj_3R_TipoDato_440_5_19()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_434_5_20()) {
+    if (jj_3R_TipoDato_441_5_20()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_435_5_21()) {
+    if (jj_3R_TipoDato_442_5_21()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_436_5_22()) return true;
+    if (jj_3R_TipoDato_443_5_22()) return true;
     }
     }
     }
@@ -2838,6 +2832,12 @@ if (jjtc000) {
   private boolean jj_3_17()
  {
     if (jj_scan_token(SINO)) return true;
+    return false;
+  }
+
+  private boolean jj_3_3()
+ {
+    if (jj_scan_token(CONST)) return true;
     return false;
   }
 

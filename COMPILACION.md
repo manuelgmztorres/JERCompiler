@@ -26,28 +26,37 @@ JERCompiler/
 ```
 
 `build` vive en la **raíz** del proyecto, como carpeta hermana de `analizador`,
-`gramaticas` y `pruebas`. Todos los comandos de esta guía se ejecutan desde
-dentro de `analizador`, apuntando a `..\build` y `..\pruebas`.
+`gramaticas` y `pruebas`. **Todos los comandos de esta guía se ejecutan parados
+en la raíz del proyecto (`JERCompiler\`)**, apuntando a `analizador\...` y
+`build\...`.
 
 ## Requisitos
 
 - JDK instalado (`javac`, `java` en el PATH).
-- JavaCC/JJTree: no están instalados como comandos `jjtree`/`javacc` en el
-  PATH. Se usa el jar directamente (`C:\JavaCC\javacc-7.0.13.jar` en esta
-  máquina): `java -cp C:\JavaCC\javacc-7.0.13.jar jjtree ...` /
-  `java -cp C:\JavaCC\javacc-7.0.13.jar javacc ...`.
+- JavaCC/JJTree: en esta máquina `C:\javacc` está en el PATH, con dos wrappers
+  (`jjtree.bat`, `javacc.bat`) que invocan
+  `java -cp C:\javacc\javacc-7.0.13.jar <jjtree|javacc> %*`. Por eso los
+  comandos de abajo son simplemente `jjtree ...`/`javacc ...` — si en otra
+  máquina esos wrappers no existen, usa la forma larga:
+  `java -cp C:\javacc\javacc-7.0.13.jar jjtree ...` /
+  `java -cp C:\javacc\javacc-7.0.13.jar javacc ...`.
+- La carpeta de salida (`build`) **no** se pasa por línea de comandos: está
+  embebida en el bloque `options{}` de `JERCompiler_JJTree.jjt`
+  (`JJTREE_OUTPUT_DIRECTORY`/`OUTPUT_DIRECTORY = "build"`), resuelta siempre
+  relativa a donde estés parado al invocar el comando — por eso es importante
+  correr todo desde la raíz.
 
 ## Pasos de compilación
 
-Parado en `JERCompiler\analizador`:
+Parado en `JERCompiler\` (la raíz del proyecto):
 
 ### 1. JJTree: traducir `.jjt` a `.jj` anotado
 
 ```powershell
-java -cp C:\JavaCC\javacc-7.0.13.jar jjtree "-OUTPUT_DIRECTORY:..\build" JERCompiler_JJTree.jjt
+jjtree analizador\JERCompiler_JJTree.jjt
 ```
 
-Genera en `..\build`:
+Genera en `build`:
 - `JERCompiler_JJTree.jj` (la gramática ya anotada para JavaCC).
 - Las clases del árbol: `Node.java`, `SimpleNode.java`, un `AST*.java` por
   cada nodo anotado con `#Nombre` en la gramática, `JERCompilerVisitor.java`,
@@ -63,27 +72,28 @@ Genera en `..\build`:
 ### 2. JavaCC: generar el parser en Java
 
 ```powershell
-java -cp C:\JavaCC\javacc-7.0.13.jar javacc "-OUTPUT_DIRECTORY:..\build" ..\build\JERCompiler_JJTree.jj
+javacc build\JERCompiler_JJTree.jj
 ```
 
-Genera en `..\build` el resto de las clases del parser: `JERCompiler.java`,
+Genera en `build` el resto de las clases del parser: `JERCompiler.java`,
 `JERCompilerTokenManager.java`, `JERCompilerConstants.java`, `Token.java`,
 `ParseException.java`, `SimpleCharStream.java`, `TokenMgrError.java`.
 
 ### 3. Compilar todo con `javac`
 
 ```powershell
-javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
+javac -d build build\*.java analizador\*.java
 ```
 
-Compila todos los `.java` generados junto con `ManejadorErrores.java`,
-`TablaSimbolos.java` y `AnalizadorSemantico.java` (los tres viven en
-`analizador`, no en `build`), dejando los `.class` en `..\build`.
+`analizador\*.java` son exactamente `ManejadorErrores.java`,
+`TablaSimbolos.java` y `AnalizadorSemantico.java` (los únicos `.java` de mano
+que viven ahí, junto al `.jjt`); `build\*.java` son todos los generados en los
+pasos 1-2. Deja todos los `.class` en `build`.
 
 ### 4. Ejecutar
 
 ```powershell
-java -cp ..\build JERCompiler ..\pruebas\prueba_codigo.txt
+java -cp build JERCompiler pruebas\prueba_codigo.txt
 ```
 
 `ManejadorErrores.ejecutar()` corre el análisis semántico automáticamente
@@ -92,22 +102,6 @@ después de parsear (crea un `AnalizadorSemantico` y lo llama con el
 paso ni flag aparte para activarlo, y corre siempre, incluso si hubo errores
 léxicos/sintácticos antes (ver el comentario junto a esa llamada en
 `ManejadorErrores.java` para el porqué).
-
-## Notas sobre `-OUTPUT_DIRECTORY`
-
-En **PowerShell**, la sintaxis `-OUTPUT_DIRECTORY=..\build` (con `=`) **no
-funciona**: PowerShell separa el argumento en el signo `=` antes de
-entregarlo a `jjtree`/`javacc`, que entonces lo interpreta mal. Hay dos
-formas correctas de pasarlo:
-
-- Con dos puntos (recomendado, sin necesidad de comillas):
-  ```powershell
-  jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
-  ```
-- Con `=` pero entre comillas, para que PowerShell no lo parta:
-  ```powershell
-  jjtree "-OUTPUT_DIRECTORY=..\build" JERCompiler_JJTree.jjt
-  ```
 
 ## `tabla_tokens.txt`: por qué antes se duplicaba y cómo se arregló
 
@@ -122,7 +116,7 @@ Es una ruta **relativa**, y Java resuelve las rutas relativas contra el
 directorio de trabajo (`cwd`) del proceso `java` en el momento de la
 ejecución — no contra la ubicación del proyecto ni de las clases. Esto
 causaba una carpeta `pruebas` distinta según desde dónde se ejecutara el
-programa:
+programa (antes de fijar la convención de correr todo desde la raíz):
 
 | Ejecutado desde...            | Escribía en...                                  |
 |--------------------------------|--------------------------------------------------|
@@ -137,19 +131,21 @@ directorios y observando dónde aparecía el archivo en cada caso.
 compiladas (`build`, vía `getProtectionDomain().getCodeSource()`) y armando
 `pruebas\tabla_tokens.txt` como carpeta hermana de `build`, en la raíz del
 proyecto. Así el archivo siempre cae en `JERCompiler\pruebas\tabla_tokens.txt`,
-sin importar desde qué directorio se invoque `java`. Si el proyecto se
-empaqueta algún día en un `.jar`, ese cálculo no aplica y el código hace
-*fallback* a la ruta relativa original.
+sin importar desde qué directorio se invoque `java` — esto sigue siendo cierto
+y es una capa extra de seguridad, aunque ahora la convención fijada es correr
+siempre desde la raíz de todos modos. Si el proyecto se empaqueta algún día en
+un `.jar`, ese cálculo no aplica y el código hace *fallback* a la ruta
+relativa original.
 
 ## Resumen de comandos (copiar y pegar)
 
-Desde `JERCompiler\analizador`:
+Desde `JERCompiler\` (la raíz):
 
 ```powershell
-java -cp C:\JavaCC\javacc-7.0.13.jar jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
-java -cp C:\JavaCC\javacc-7.0.13.jar javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
-javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
-java -cp ..\build JERCompiler ..\pruebas\prueba_codigo.txt
+jjtree analizador\JERCompiler_JJTree.jjt
+javacc build\JERCompiler_JJTree.jj
+javac -d build build\*.java analizador\*.java
+java -cp build JERCompiler pruebas\prueba_codigo.txt
 ```
 
 ## Recompilar tras cambios

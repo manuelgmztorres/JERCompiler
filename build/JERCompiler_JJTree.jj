@@ -59,6 +59,13 @@ options {
                       
                            
                       
+                                                                                       
+                                                                                    
+                                                                                             
+                                                                                        
+                               
+                                    
+  OUTPUT_DIRECTORY = "build";
 }
 
 PARSER_BEGIN(JERCompiler)
