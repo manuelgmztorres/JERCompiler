@@ -96,6 +96,12 @@ public final class ManejadorErrores implements JERCompilerConstants {
     AnalizadorSemantico analizador = null;
     try {
       ASTPrograma raiz = new JERCompiler(new ByteArrayInputStream(contenido)).Programa();
+      // El modo panico (ultimoIndiceReportado) solo debe suprimir cascadas DENTRO de la fase
+      // sintactica que acaba de terminar. La fase semantica es un recorrido nuevo, separado, del
+      // AST completo: puede (y suele) reportar errores en tokens anteriores al ultimo error
+      // sintactico visto (p. ej. una declaracion global con tipo incompatible, seguida mas abajo
+      // de un error de sintaxis) y esos NO son una cascada retrograda que haya que descartar.
+      ultimoIndiceReportado = -1;
       analizador = new AnalizadorSemantico();
       analizador.analizar(raiz);
     }

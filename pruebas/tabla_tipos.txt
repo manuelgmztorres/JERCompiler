@@ -1,11 +1,9 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_luis.txt
+Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_tabla_simbolos.txt
 Nombre               | Categoria  | Tipo   | Aridad | Linea  | Parametros
 ----------------------+------------+--------+--------+--------+------------------------
-main                 | funcion    | VACIO  | 0      | 1      | []
-positivo             | variable   | ENT    | 0      | 2      | 
-negativo             | variable   | ENT    | 0      | 3      | 
-ceros                | variable   | ENT    | 0      | 4      | 
-i                    | variable   | ENT    | 0      | 6      | 
-numero               | variable   | ENT    | 0      | 8      | 
+hola                 | variable   | CAD    | 0      | 1      | 
+mundo                | variable   | CAD    | 0      | 2      | 
+pruebaFuncion        | funcion    | VACIO  | 0      | 4      | []
+bandera              | variable   | BOO    | 0      | 5      | 
 --------------------------------------------
