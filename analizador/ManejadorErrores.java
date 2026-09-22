@@ -831,13 +831,15 @@ public final class ManejadorErrores implements JERCompilerConstants {
     StringWriter buffer = new StringWriter();
     PrintWriter w = new PrintWriter(buffer);
     w.println("TABLA DE TIPOS - JERCompiler"); w.println("Archivo: " + nombreArchivo);
-    w.printf("%-20s | %-10s | %-6s | %-6s | %-6s | %s%n", "Nombre", "Categoria", "Tipo", "Aridad", "Linea", "Parametros");
-    w.println("----------------------+------------+--------+--------+--------+------------------------");
+    w.printf("%-20s | %-10s | %-6s | %-11s | %-16s | %-6s | %-5s | %s%n",
+      "Nombre", "Categoria", "Tipo", "Dimensiones", "Ambito", "Linea", "Usado", "Parametros");
+    w.println("----------------------+------------+--------+-------------+------------------+--------+-------+------------------------");
     for (TablaSimbolos.Simbolo simbolo : tabla.todos()) {
       String parametros = simbolo.tiposParametros == null ? "" : simbolo.tiposParametros.toString();
-      w.printf("%-20s | %-10s | %-6s | %-6d | %-6d | %s%n",
+      w.printf("%-20s | %-10s | %-6s | %-11d | %-16s | %-6d | %-5s | %s%n",
         simbolo.nombre, descripcionCategoria(simbolo.categoria), simbolo.tipo,
-        simbolo.aridadArreglo, simbolo.declaracion.beginLine, parametros);
+        simbolo.aridadArreglo, simbolo.ambito, simbolo.declaracion.beginLine,
+        simbolo.usado ? "si" : "no", parametros);
     }
     w.println("--------------------------------------------");
     return buffer.toString();

@@ -45,6 +45,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   private int profundidadAnidamiento = 0;
 
   private void entrarScope() { tabla.entrarScope(); profundidadAnidamiento++; }
+  private void entrarScope(String nombreFuncion) { tabla.entrarScopeDeFuncion(nombreFuncion); profundidadAnidamiento++; }
   private void salirScope() { tabla.salirScope(); profundidadAnidamiento--; }
 
   public void analizar(ASTPrograma raiz) {
@@ -101,7 +102,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       tamanios = new int[aridad];
       for (int i = 0; i < aridad; i++) tamanios[i] = tamanioLiteralDeDimension(dimensiones.jjtGetChild(i));
     }
-    TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(idToken.image, categoria, tipo, aridad, null, idToken, tamanios);
+    TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(idToken.image, categoria, tipo, aridad, null, idToken, tamanios, tabla.ambitoActual());
     TablaSimbolos.Simbolo previo = tabla.declarar(simbolo);
     if (previo != null) ManejadorErrores.reportarSimboloDuplicado(idToken, categoria, previo);
   }
@@ -259,6 +260,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   private TablaSimbolos.TipoDato validarLlamadaFuncion(Token idToken, SimpleNode nodo, Object data) {
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(idToken); nodo.childrenAccept(this, data); return null; }
+    simbolo.marcarUsado();
     if (simbolo.categoria != TablaSimbolos.Categoria.FUNCION) {
       ManejadorErrores.reportarLlamadaANoFuncion(idToken, simbolo.categoria);
       nodo.childrenAccept(this, data);
@@ -313,7 +315,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       tiposParametros.add(tipo);
     }
     TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(nombreToken.image, TablaSimbolos.Categoria.FUNCION,
-        tipoRetorno, 0, tiposParametros, nombreToken, null);
+        tipoRetorno, 0, tiposParametros, nombreToken, null, tabla.ambitoActual());
     TablaSimbolos.Simbolo previo = tabla.declarar(simbolo);
     if (previo != null) ManejadorErrores.reportarSimboloDuplicado(nombreToken, TablaSimbolos.Categoria.FUNCION, previo);
   }
@@ -361,7 +363,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     Token nombreToken = siguiente(retornoToken);
     TablaSimbolos.TipoDato tipoRetornoAnterior = tipoRetornoFuncionActual;
     tipoRetornoFuncionActual = retornoToken == null ? null : tipoDeToken(retornoToken.kind);
-    entrarScope();
+    if (nombreToken != null) entrarScope(nombreToken.image); else entrarScope(); // header roto: sin nombre, hereda el ambito de afuera
     node.childrenAccept(this, data); // declara cada ASTParametro y luego visita el ASTBloque del cuerpo
     salirScope();
     // Ningun camino de ejecucion garantiza un RET (ver bloqueSiempreTermina): solo tiene sentido
@@ -474,7 +476,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (idToken == null) return null; // roto por un error sintactico ya reportado
     TablaSimbolos.TipoDato tipo = tipoDeToken(tipoToken.kind);
     if (tipo == null) return null;
-    TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(idToken.image, TablaSimbolos.Categoria.PARAMETRO, tipo, 0, null, idToken, null);
+    TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(idToken.image, TablaSimbolos.Categoria.PARAMETRO, tipo, 0, null, idToken, null, tabla.ambitoActual());
     TablaSimbolos.Simbolo previo = tabla.declarar(simbolo);
     if (previo != null) ManejadorErrores.reportarSimboloDuplicado(idToken, TablaSimbolos.Categoria.PARAMETRO, previo);
     return null;
@@ -496,6 +498,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (idToken == null) return null; // roto por un error sintactico ya reportado
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(idToken); return null; }
+    simbolo.marcarUsado();
     if (simbolo.categoria == TablaSimbolos.Categoria.FUNCION) { ManejadorErrores.reportarUsoDeFuncionComoValor(idToken); return null; }
     if (simbolo.categoria == TablaSimbolos.Categoria.CONSTANTE) { ManejadorErrores.reportarAsignacionAConstante(idToken, simbolo.nombre); return null; }
     if (simbolo.aridadArreglo > 0) { ManejadorErrores.reportarAridadArregloIncorrecta(idToken, simbolo.nombre, 0, simbolo.aridadArreglo); return null; }
@@ -542,6 +545,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(idToken); node.childrenAccept(this, data); return null; }
+    simbolo.marcarUsado();
     if (simbolo.categoria == TablaSimbolos.Categoria.FUNCION) { ManejadorErrores.reportarUsoDeFuncionComoValor(idToken); node.childrenAccept(this, data); return null; }
 
     // Un ASTOperadorAsignacion entre los hijos marca donde termina la lista de indices de
@@ -656,6 +660,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     Token idToken = node.jjtGetFirstToken();
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(idToken); return null; }
+    simbolo.marcarUsado();
     if (simbolo.tipo != TablaSimbolos.TipoDato.ENT && simbolo.tipo != TablaSimbolos.TipoDato.DEC) {
       ManejadorErrores.reportarOperandoNoNumerico(idToken, simbolo.tipo);
       return null;
@@ -837,6 +842,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     // IDENTIFICADOR: variable/constante/parametro, con 0+ accesos de arreglo entre corchetes.
     TablaSimbolos.Simbolo simbolo = tabla.resolver(primero.image);
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(primero); return null; }
+    simbolo.marcarUsado();
     if (simbolo.categoria == TablaSimbolos.Categoria.FUNCION) { ManejadorErrores.reportarUsoDeFuncionComoValor(primero); return null; }
 
     int accesos = node.jjtGetNumChildren();
