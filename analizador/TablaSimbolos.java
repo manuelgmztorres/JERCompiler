@@ -3,18 +3,15 @@ import java.util.*;
 /**
  * Colaboradores: Manuel Gomez, Luis Eduardo Hernandez Morales, Angel Horacio.
  *
- * Tabla de simbolos con scope por bloque (ver memoria de diseno: decision-scoping-tabla-simbolos).
+ * Tabla de simbolos con scope por bloque (ver decision-scoping-tabla-simbolos). Un unico
+ * Scope global comparte namespace entre funciones y variables/constantes; cada funcion y
+ * cada bloque anidado abre su propio Scope hijo. declarar() solo choca contra el scope
+ * actual, nunca contra un padre, asi que el shadowing de un global por un local siempre es
+ * valido.
  *
- * Un unico Scope global comparte namespace entre funciones y variables/constantes; cada
- * funcion y cada bloque anidado dentro de ella abre su propio Scope hijo. declarar() solo
- * choca contra el scope actual, nunca contra un padre, asi que el shadowing de un global por
- * un local siempre es valido.
- *
- * No sabe nada de control de flujo, es decir en que funcion o bucle esta el visitor en un
- * momento dado: eso lo rastrea el propio analizador semantico con campos simples, igual que
- * el parser ya hace con profundidadFuncion en JERCompiler_JJTree.jjt. Tampoco hace chequeo de
- * tipos, solo declara y resuelve simbolos por nombre; el chequeo de tipos vive en la segunda
- * pasada del visitor.
+ * No sabe nada de control de flujo (en que funcion o bucle esta el visitor): eso lo rastrea
+ * el propio analizador semantico con campos simples. Tampoco hace chequeo de tipos, solo
+ * declara y resuelve simbolos por nombre; eso vive en la segunda pasada del visitor.
  */
 public final class TablaSimbolos {
 

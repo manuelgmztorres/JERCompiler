@@ -7,29 +7,22 @@ import java.util.*;
  *
  * Ejecucion, diagnosticos y tabla de tokens del analizador JER.
  *
- * Principio de diseno para cualquier reporte de error, sintactico o semantico: preferir
- * siempre un reporte directo con contexto explicito, ya que la gramatica o el chequeo que
- * detecta el problema ya sabe exactamente que paso (ver reportarRetornoFueraFuncion(),
- * reportarColaHacerIncompleta(), reportarCabeceraRepetirIncompleta(), reportarErrorSemantico()),
- * en vez de intentar reconstruirlo adivinando desde una excepcion generica.
- *
- * diagnosticar(), el diagnostico por ParseException, es el ultimo recurso para cuando no hay
- * un chequeo especifico escrito. Toda regla ahi que reclame "el token X esta mal ubicado" debe
- * corroborarlo contra expectedTokenSequences (via espera()) antes de afirmarlo, nunca disparar
- * solo por identidad de token. La Capa 2 original, RET/SINO/CUANDO/PRED por identidad de
- * token, violaba esto y se elimino; ver el comentario en diagnosticar().
+ * Principio de diseno: preferir siempre un reporte directo con contexto explicito, ya que la
+ * gramatica o el chequeo que detecta el problema ya sabe que paso (ver
+ * reportarRetornoFueraFuncion(), reportarColaHacerIncompleta(),
+ * reportarCabeceraRepetirIncompleta()), en vez de reconstruirlo adivinando desde una
+ * excepcion generica. diagnosticar() es el ultimo recurso para cuando no hay un chequeo
+ * especifico: toda regla ahi debe corroborar contra expectedTokenSequences (via espera())
+ * antes de afirmar que un token esta mal ubicado, nunca disparar solo por identidad de token.
  */
 public final class ManejadorErrores implements JERCompilerConstants {
   private static final String ARCHIVO_TABLA = resolverRutaTabla();
 
   /**
-   * Calcula la ruta de tabla_tokens.txt de forma independiente del directorio de trabajo
-   * (cwd) desde el que se invoque "java". En vez de usar una ruta relativa "pruebas/..."
-   * (que Java resuelve contra el cwd del proceso, no contra la ubicacion del proyecto),
-   * se ubica el directorio que contiene las clases compiladas (normalmente "build") y se
-   * asume que "pruebas" es una carpeta hermana de ese directorio, en la raiz del proyecto.
-   * Si por algun motivo no se puede determinar (por ejemplo, empaquetado en un .jar), se
-   * hace fallback a la ruta relativa original.
+   * Calcula la ruta de tabla_tokens.txt independiente del cwd desde el que se invoque "java".
+   * En vez de una ruta relativa "pruebas/..." (que Java resuelve contra el cwd del proceso),
+   * ubica el directorio de las clases compiladas ("build") y asume que "pruebas" es su
+   * carpeta hermana en la raiz del proyecto. Si no se puede determinar, cae a la ruta relativa.
    */
   private static String resolverRutaTabla() {
     try {
@@ -179,11 +172,9 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Punto de entrada generico para reportes semanticos que aun no tienen su propio metodo
-   * dedicado. Igual que reportarRetornoFueraFuncion() o reportarCabeceraRepetirIncompleta(),
-   * el reporte siempre debe venir con contexto explicito (linea y columna reales del
-   * nodo o token involucrado, detalle concreto), nunca reconstruido adivinando desde una
-   * excepcion generica.
+   * Punto de entrada generico para reportes semanticos sin metodo dedicado propio. El reporte
+   * siempre debe venir con contexto explicito (linea, columna, detalle concreto), nunca
+   * reconstruido adivinando desde una excepcion generica.
    */
   public static void reportarErrorSemantico(int linea, int columna, String detalle, String sugerencia) {
     registrar(new ErrorJER("ERROR SEMANTICO", linea, columna, detalle, sugerencia, true));
@@ -191,9 +182,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
 
   /**
    * Reporte centralizado para TablaSimbolos.declarar(): arma el mensaje segun las categorias
-   * en conflicto (variable, constante, parametro, funcion) en vez de dejar que cada visitor
-   * semantico redacte su propio texto. tokenNuevo es el identificador que se intento declarar;
-   * previo es el simbolo ya existente en ese mismo scope que devolvio declarar().
+   * en conflicto. tokenNuevo es el identificador que se intento declarar; previo es el simbolo
+   * ya existente en ese scope que devolvio declarar().
    */
   public static void reportarSimboloDuplicado(Token tokenNuevo, TablaSimbolos.Categoria categoriaNueva, TablaSimbolos.Simbolo previo) {
     String nombre = tokenNuevo.image;
@@ -341,10 +331,9 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Diagnostico dedicado para la cola 'MIENTRAS ( condicion ) ;' de HACER...MIENTRAS.
-   * Se distingue por etapa (no por patron de token anterior/actual) porque el hueco
-   * "MIENTRAS (" es indistinguible por adyacencia de tokens del inicio de una
-   * EstructuraMientras corriente; JERCompiler.jj ya sabe en que pieza fallo.
+   * Diagnostico dedicado para la cola 'MIENTRAS ( condicion ) ;' de HACER...MIENTRAS. Se
+   * distingue por etapa, no por token anterior/actual, porque el hueco "MIENTRAS (" es
+   * indistinguible por adyacencia de tokens del inicio de un MIENTRAS corriente.
    */
   public static void reportarColaHacerIncompleta(int etapa, ParseException error) {
     Token token = error.currentToken != null && error.currentToken.next != null ? error.currentToken.next : error.currentToken;
@@ -402,13 +391,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Cuenta el desbalance de '{'/'}' entre el token dado (el propio FUN de una funcion,
-   * exclusive) y el siguiente FUN de nivel global (o EOF). Es una pregunta que si tiene
-   * respuesta cierta, a diferencia de "cual '{' especifica le falta su '}'", que es ambiguo
-   * cuando el conteo no cuadra.
-   *
-   * Sirve para decidir si vale la pena seguir intentando recuperar sentencia por sentencia,
-   * o si es mas honesto rendirse con un solo diagnostico.
+   * Cuenta el desbalance de '{'/'}' entre el FUN de una funcion (exclusive) y el siguiente
+   * FUN global (o EOF): a diferencia de "cual '{' le falta su '}'", que es ambiguo, esto si
+   * tiene respuesta cierta. Sirve para decidir si vale la pena seguir recuperando sentencia
+   * por sentencia, o rendirse con un solo diagnostico.
    */
   public static boolean hayDesbalanceDeLlavesEnFuncion(Token inicioFuncion) {
     int indiceInicio = indiceDe(inicioFuncion.beginLine, inicioFuncion.beginColumn);
@@ -657,12 +643,9 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
   /**
    * Para diagnosticos de algo ausente ("falta ..."): el token donde JavaCC detecto la falla
-   * suele ser el primer token de la sentencia siguiente, que puede caer varias lineas mas
-   * abajo del lugar real donde faltaba el simbolo.
-   *
-   * Se reporta sobre el ultimo token valido (anterior) en su lugar, que es donde el simbolo
-   * ausente debia haber ido. Toda regla nueva que agregue un mensaje "falta X" debe usar
-   * este metodo, no alta(), para no reintroducir el desfase de linea/columna.
+   * suele caer varias lineas despues del lugar real. Se reporta sobre el ultimo token valido
+   * (anterior) en su lugar. Toda regla que agregue un mensaje "falta X" debe usar este
+   * metodo, no alta(), para no reintroducir el desfase de linea/columna.
    */
   private static ErrorJER faltante(Token anterior, Token token, String detalle, String sugerencia) {
     Token referencia = anterior != null ? anterior : token;
