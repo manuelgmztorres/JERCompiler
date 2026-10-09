@@ -10,7 +10,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -22,8 +22,8 @@ import java.util.regex.Pattern;
 public class JERIde extends JFrame {
     private static final int TIMEOUT_COMPILACION_SEG = 30;
     /** "[ERROR ...] Linea N" en la salida del compilador. */
-    private static final Pattern PATRON_ERROR = Pattern.compile("^\\[ERROR[^\\]]*\\]\\s*Linea (\\d+)");
-    private static final Pattern PATRON_LINEA = Pattern.compile("Linea (\\d+)");
+    private static final Pattern PATRON_ERROR = Pattern.compile("^\\[ERROR[^\\]]*\\]\\s*L[ií]nea (\\d+)");
+    private static final Pattern PATRON_LINEA = Pattern.compile("L[ií]nea (\\d+)");
 
     private final Preferences prefs = Preferences.userNodeForPackage(JERIde.class);
     private final JTabbedPane pestanas = new JTabbedPane();
@@ -522,7 +522,7 @@ public class JERIde extends JFrame {
                         p.destroyForcibly();
                         return "El compilador no respondio en " + TIMEOUT_COMPILACION_SEG + " s; se cancelo.";
                     }
-                    return new String(Files.readAllBytes(tmp.toPath()), Charset.defaultCharset());
+                    return new String(Files.readAllBytes(tmp.toPath()), StandardCharsets.UTF_8);
                 } finally {
                     tmp.delete();
                 }

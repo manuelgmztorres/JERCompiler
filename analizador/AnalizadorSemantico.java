@@ -347,7 +347,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       Node hijo = node.jjtGetChild(i);
       TablaSimbolos.TipoDato tipo = (TablaSimbolos.TipoDato) hijo.jjtAccept(this, data);
       if (tipo != null && tipo != TablaSimbolos.TipoDato.ENT) {
-        ManejadorErrores.reportarExpresionDebeSerEntera(((SimpleNode) hijo).jjtGetFirstToken(), tipo, "una dimension de arreglo");
+        ManejadorErrores.reportarExpresionDebeSerEntera(((SimpleNode) hijo).jjtGetFirstToken(), tipo, "una dimensión de arreglo");
       }
     }
     return null;
@@ -487,7 +487,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
   @Override public Object visit(ASTSentenciaObtener node, Object data) {
     Token idToken = siguiente(node.jjtGetFirstToken()); // OBT -> identificador
-    if (idToken == null) return null; // roto por un error sintactico ya reportado
+    if (idToken == null || idToken.kind != JERCompilerConstants.IDENTIFICADOR) return null; // roto por un error sintactico ya reportado ("OBT ;")
     TablaSimbolos.Simbolo simbolo = tabla.resolver(idToken.image);
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(idToken); return null; }
     simbolo.marcarUsado();
@@ -554,7 +554,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       Node indice = node.jjtGetChild(i);
       TablaSimbolos.TipoDato tipoIndice = (TablaSimbolos.TipoDato) indice.jjtAccept(this, data);
       if (tipoIndice != null && tipoIndice != TablaSimbolos.TipoDato.ENT) {
-        ManejadorErrores.reportarExpresionDebeSerEntera(((SimpleNode) indice).jjtGetFirstToken(), tipoIndice, "un indice de arreglo");
+        ManejadorErrores.reportarExpresionDebeSerEntera(((SimpleNode) indice).jjtGetFirstToken(), tipoIndice, "un índice de arreglo");
       }
     }
     boolean aridadOk = numIndices == simbolo.aridadArreglo;
@@ -848,7 +848,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       Node indice = node.jjtGetChild(i);
       TablaSimbolos.TipoDato tipoIndice = (TablaSimbolos.TipoDato) indice.jjtAccept(this, data);
       if (tipoIndice != null && tipoIndice != TablaSimbolos.TipoDato.ENT) {
-        ManejadorErrores.reportarExpresionDebeSerEntera(((SimpleNode) indice).jjtGetFirstToken(), tipoIndice, "un indice de arreglo");
+        ManejadorErrores.reportarExpresionDebeSerEntera(((SimpleNode) indice).jjtGetFirstToken(), tipoIndice, "un índice de arreglo");
       }
     }
     if (accesos != simbolo.aridadArreglo) {

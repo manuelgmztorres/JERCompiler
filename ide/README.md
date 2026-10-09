@@ -7,7 +7,7 @@ IDE minimo en Swing para escribir y compilar codigo JER sin usar la terminal.
 Desde la raiz del proyecto (`JERCompiler\`), porque el IDE busca `build\` y `pruebas\` como carpetas relativas al directorio de trabajo:
 
 ```
-javac -d ide ide/JERSyntaxHighlighter.java ide/NumeroLineaGutter.java ide/EditorTab.java ide/JERIde.java
+javac -encoding UTF-8 -d ide ide/JERSyntaxHighlighter.java ide/NumeroLineaGutter.java ide/EditorTab.java ide/JERIde.java
 java -cp ide JERIde
 ```
 

@@ -42,7 +42,7 @@ FUN VACIO principal() {
 
 ## Análisis semántico
 
-Después de parsear, `AnalizadorSemantico` recorre el AST (vía el visitor `JERCompilerVisitor` que genera JJTree) en dos pasadas: la primera registra en una tabla de símbolos las variables, constantes y funciones globales (con su firma completa), para que una función pueda llamar a otra declarada más abajo en el archivo; la segunda entra a cada función y valida su cuerpo. Los errores que encuentra se imprimen como `[ERROR SEMANTICO]`, junto con los léxicos/sintácticos.
+Después de parsear, `AnalizadorSemantico` recorre el AST (vía el visitor `JERCompilerVisitor` que genera JJTree) en dos pasadas: la primera registra en una tabla de símbolos las variables, constantes y funciones globales (con su firma completa), para que una función pueda llamar a otra declarada más abajo en el archivo; la segunda entra a cada función y valida su cuerpo. Los errores que encuentra se imprimen como `[ERROR SEMÁNTICO]`, junto con los léxicos/sintácticos.
 
 Reglas que aplica:
 * **Tipos estrictos, sin conversión implícita:** `ENT` y `DEC` nunca se mezclan (ni entre sí ni con ningún otro tipo) en aritmética, comparaciones, asignaciones o retornos — el programador debe declarar el tipo correcto de antemano. La única excepción es `+`, que concatena si cualquiera de los dos lados es `CAD` (el resultado es `CAD`, sea cual sea el otro tipo); `-`, `*`, `/`, `%`, `**`, `//` nunca aceptan `CAD`.
@@ -97,7 +97,7 @@ Cualquier cambio en el código —gramática o los tres `.java` de mano— se re
 ```powershell
 jjtree analizador\JERCompiler_JJTree.jjt
 javacc build\JERCompiler_JJTree.jj
-javac -d build build\*.java analizador\*.java
+javac -encoding UTF-8 -d build build\*.java analizador\*.java
 ```
 
 Después de cualquiera de los dos casos de arriba, vuelve a **"Ejecutar el compilador sobre un archivo"** para probar el resultado.
