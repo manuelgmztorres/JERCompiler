@@ -7,12 +7,11 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
 
   /**
    * Senal de "esta funcion no se puede recuperar con confianza, abandonar el resto de su
-   * cuerpo" (ver llavesDesbalanceadasEnFuncionActual). Al ser un RuntimeException (no
-   * ParseException) atraviesa limpiamente todos los try/catch(ParseException) intermedios,
-   * sin importar cuan anidados esten, hasta el unico lugar que la espera: DeclaracionFuncion().
-   * Nota de la migración: por el mismo motivo, atraviesa igualmente los try/catch(Throwable)
-   * que JJTree genera para cada nodo intermedio, descartando limpiamente cada subárbol parcial
-   * a su paso (ver comentario de diseño al inicio del archivo).
+   * cuerpo" (ver llavesDesbalanceadasEnFuncionActual). Al ser RuntimeException, no
+   * ParseException, atraviesa todos los try/catch(ParseException) intermedios, sin importar
+   * cuan anidados esten, hasta el unico lugar que la espera: DeclaracionFuncion(). Por el
+   * mismo motivo atraviesa tambien los try/catch(Throwable) que JJTree genera por nodo,
+   * descartando cada subarbol parcial a su paso (ver comentario de diseno arriba).
    */
   static final class AbandonoRecuperacion extends RuntimeException {}
   private boolean llavesDesbalanceadasEnFuncionActual = false;
@@ -48,12 +47,11 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
     do {
       Token t = getToken(1);
       if (t.kind == CIERRE_BLOQUE && llavesDesbalanceadasEnFuncionActual) {
-        // Este es el punto de decision real para el caso "sentencia rota + '}' propia TAMBIEN
-        // faltante": una sentencia fallo (p. ej. le falta ';'), Sentencia() ya se recupero por
-        // su cuenta, y estamos a punto de dejar esta '}' para el bloque exterior (la gramatica
-        // normal de Bloque() la consumiria sin pasar por ningun catch). Si esta funcion ya tiene
-        // un desbalance de llaves detectado, esa '}' puede no ser la que corresponde — mejor
-        // rendirse aqui con un solo diagnostico que dejar que Bloque() la trague como si nada.
+        // Caso "sentencia rota + '}' propia tambien faltante": una sentencia fallo, ya se
+        // recupero por su cuenta, y esta '}' esta a punto de quedar para el bloque exterior
+        // sin pasar por ningun catch. Si esta funcion ya tiene un desbalance de llaves
+        // detectado, esa '}' puede no ser la que corresponde: mejor rendirse aqui con un solo
+        // diagnostico que dejar que Bloque() la trague como si nada.
         ManejadorErrores.reportarDesbalanceDeLlaves(t);
         throw new AbandonoRecuperacion();
       }
@@ -67,15 +65,15 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
 
   /**
    * Recuperacion especifica para el FUN anidado que SentenciaInvalida() tolera una vez como
-   * "basura" dentro de un bloque (ver funComoBasura en Bloque()). A diferencia de
-   * recuperarSentencia(), NO se detiene en un token que luzca como inicio de una sentencia
-   * normal (un tipo de dato, un identificador): lo que sigue a ese FUN es la cabecera de OTRA
-   * funcion completa (tipo de retorno, nombre, parametros), no una sentencia suelta del bloque
-   * actual. Detenerse ahi (como hace recuperarSentencia() vía esSincronizacionDeSentencia) deja
-   * la cabecera a medio interpretar como si fuera una declaracion de variable ("DEC calcular"
-   * se lee como "DEC calcular;") y dispara una cascada de errores espurios cuando en realidad
-   * el problema real es uno solo: a la funcion anterior le falta su '}' de cierre. Se descarta
-   * la cabecera completa y, si llega a abrir, tambien su cuerpo entero via consumirBloqueSuelto().
+   * basura dentro de un bloque (ver funComoBasura en Bloque()).
+   *
+   * A diferencia de recuperarSentencia(), no se detiene en un token que luzca como inicio de
+   * sentencia normal: lo que sigue a ese FUN es la cabecera de otra funcion completa, no una
+   * sentencia suelta del bloque actual. Detenerse ahi la interpretaria a medias como una
+   * declaracion de variable ("DEC calcular" leido como "DEC calcular;") y dispararia una
+   * cascada de errores, cuando el problema real es uno solo: a la funcion anterior le falta
+   * su '}' de cierre. Se descarta la cabecera completa y, si llega a abrir, tambien su cuerpo
+   * entero via consumirBloqueSuelto().
    */
   void recuperarFunAnidado() {
     do {
@@ -92,9 +90,9 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
   }
 
   /**
-   * Analiza un bloque '{ ... }' que quedó huérfano tras un error. Saltarlo token a token
-   * desbalancearía las llaves y haría que la '}' del bloque exterior se fugue al nivel global,
-   * contaminando todo lo que viene después.
+   * Analiza un bloque '{ ... }' que quedo huerfano tras un error. Saltarlo token a token
+   * desbalancearia las llaves y haria que la '}' del bloque exterior se fugue al nivel
+   * global, contaminando todo lo que viene despues.
    */
   void consumirBloqueSuelto() {
     try {
@@ -115,16 +113,13 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
   }
 
   /**
-   * Rescata una cabecera entre parentesis (la de REPETIR '( declaracion ; condicion ; paso )',
-   * o la lista de parametros de una funcion '( tipo id, ... )') tras un error. A diferencia de
-   * recuperarCabeceraBloque(), no puede parar en el primer token que parezca el inicio de una
-   * sentencia: un parametro o un paso rotos (p. ej. 'ENT inicio' o 'j +-> 1') tambien lo
+   * Rescata una cabecera entre parentesis (la de REPETIR, o la lista de parametros de una
+   * funcion) tras un error. A diferencia de recuperarCabeceraBloque(), no puede parar en el
+   * primer token que parezca inicio de sentencia: un parametro o un paso rotos tambien lo
    * parecen, y dejarlos sueltos los reprocesaria como sentencias o declaraciones globales
-   * nuevas, generando errores en cascada (confirmado con fuzzing: una funcion con '(' faltante
-   * dejaba su parametro suelto, que luego se reinterpretaba como una declaracion global rota).
-   * En vez de eso, salta hasta el ')' que cierra la cabecera (respetando parentesis anidados,
-   * p. ej. 'j < (3 + 1)') y lo consume. Si '(' nunca llego a abrirse, simplemente salta hasta
-   * '{' sin necesitar un ')' que quiza no exista.
+   * nuevas, generando errores en cascada (confirmado con fuzzing). En vez de eso, salta hasta
+   * el ')' que cierra la cabecera, respetando parentesis anidados, y lo consume. Si '(' nunca
+   * llego a abrirse, salta directo hasta '{' sin necesitar un ')' que quiza no exista.
    */
   void recuperarCabeceraParentizada(boolean abierto) {
     int profundidad = abierto ? 1 : 0;
@@ -143,9 +138,9 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
   }
 
   /**
-   * Un IDENTIFICADOR sólo inicia una sentencia si le sigue un operador de asignación, '(', '[',
-   * '++' o '--'. Sin esta comprobación el parser se resincroniza sobre cualquier identificador
-   * suelto y vuelve a analizar basura, generando errores en cascada.
+   * Un IDENTIFICADOR solo inicia una sentencia si le sigue un operador de asignacion, '(',
+   * '[', '++' o '--'. Sin esta comprobacion el parser se resincroniza sobre cualquier
+   * identificador suelto y vuelve a analizar basura, generando errores en cascada.
    */
   boolean esSincronizacionDeSentencia(Token t) {
     if (t.kind == IDENTIFICADOR) {
@@ -157,35 +152,29 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
   }
 
   /**
-   * Tokens que jamas pueden ser el inicio de otra Sentencia() dentro de un bloque: si el
-   * bloque nunca llega a su '}' (p. ej. porque falta) y el siguiente token es uno de estos,
-   * el bucle de Sentencia() de Bloque() debe parar aqui en vez de seguir intentando parsear
-   * mas contenido. 'permiteSino' es true solo cuando este Bloque() es el cuerpo "then" de un
-   * EstructuraSi() (el unico lugar donde un SINO que sigue es legitimamente la continuacion
-   * de la construccion, no basura): si el '}' de ese cuerpo falta, tratar SINO como fin de
-   * bloque evita que se consuma como sentencia invalida y que la EstructuraSi() (o cadena
-   * SINO SI) que sigue termine "robando" una llave de cierre que no le pertenece.
+   * Tokens que jamas pueden ser el inicio de otra Sentencia(): si el '}' del bloque falta y
+   * el siguiente token es uno de estos, el bucle de Sentencia() en Bloque() debe parar aqui.
+   * 'permiteSino' es true solo para el cuerpo "then" de un EstructuraSi(), el unico lugar
+   * donde un SINO que sigue es legitimo y no basura: tratarlo como fin de bloque evita que se
+   * consuma como sentencia invalida y "robe" una llave de cierre que no le pertenece.
    */
   boolean esFinDeBloque(Token t, boolean permiteSino) {
     return t.kind == CIERRE_BLOQUE || t.kind == EOF || (permiteSino && t.kind == SINO);
   }
 
   /**
-   * Rescata el cuerpo completo de un bloque tras un error en su apertura o en su cierre:
-   * analiza todas las sentencias que encuentre en lugar de sólo la primera, evitando que el
-   * resto del cuerpo se desborde al nivel global.
-   *
-   * Si el bloque nunca llegó a abrirse (faltaba la '{'), la '}' que se encuentre pertenece al
-   * bloque exterior: hay que dejarla sin consumir para no desincronizar las llaves.
+   * Rescata el cuerpo completo de un bloque tras un error en su apertura o cierre: analiza
+   * todas las sentencias que encuentre, no solo la primera, para que el resto del cuerpo no
+   * se desborde al nivel global. Si el bloque nunca llego a abrirse, la '}' que se encuentre
+   * pertenece al bloque exterior y hay que dejarla sin consumir.
    */
   void recuperarCuerpoBloque(Token aperturaTok, boolean nivelSuperior) {
     if (aperturaTok != null && llavesDesbalanceadasEnFuncionActual) {
-      // El bloque SI abrio bien, pero esta funcion tiene una cantidad de '{'/'}' que no cuadra
-      // en algun lugar (detectado de antemano, con certeza, contando toda la funcion). No hay
-      // forma confiable de saber si la '}' que sigue es realmente la mia o la de un nivel
-      // exterior (es ambiguo por naturaleza: ver comentario en ManejadorErrores). Rendirse aqui
-      // con un solo diagnostico es mas honesto que seguir adivinando sentencia por sentencia y
-      // terminar atribuyendo 2-4 errores al lugar equivocado.
+      // El bloque abrio bien, pero esta funcion tiene un desbalance de '{'/'}' detectado de
+      // antemano. No hay forma confiable de saber si la '}' que sigue es la mia o la de un
+      // nivel exterior (ver comentario en ManejadorErrores); mejor rendirse aqui con un solo
+      // diagnostico que atribuir 2-4 errores al lugar equivocado adivinando sentencia por
+      // sentencia.
       ManejadorErrores.reportarDesbalanceDeLlaves(aperturaTok);
       throw new AbandonoRecuperacion();
     }
@@ -194,13 +183,11 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
       if (t.kind == EOF || t.kind == SINO || t.kind == FUN) return;
       if (t.kind == CIERRE_BLOQUE) {
         if (aperturaTok != null) { getNextToken(); return; }
-        // Este bloque nunca abrio, asi que esta '}' no puede ser suya por la gramatica normal.
-        // Si es el cuerpo de una funcion (nivelSuperior), no hay nada por encima que vaya a
-        // reclamarla jamas (Programa() nunca espera una '}' suelta) — consumirla siempre.
-        // Si no, solo si lo siguiente es OTRA '}' (o SINO/CUANDO/PRED) es señal de que esta '}'
-        // en realidad le tocaba a este bloque fantasma (compensa su '{' faltante): consumirla
-        // evita que el nivel que lo envuelve la tome como propia y deje huerfana la '}' que de
-        // verdad le corresponde a el. En cualquier otro caso se deja para el nivel exterior.
+        // Este bloque nunca abrio, asi que esta '}' no es suya por la gramatica normal. Si es
+        // el cuerpo de una funcion (nivelSuperior), nada por encima la va a reclamar jamas, asi
+        // que se consume siempre. Si no, solo se consume cuando lo siguiente es otra '}' o un
+        // marcador SINO/CUANDO/PRED, senal de que compensaba el '{' faltante de este bloque
+        // fantasma; de lo contrario se deja para el nivel exterior.
         if (nivelSuperior) { getNextToken(); return; }
         int siguiente = getToken(2).kind;
         if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED || siguiente == CIERRE_BLOQUE) getNextToken();
@@ -240,8 +227,8 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
       if (t.kind == CIERRE_BLOQUE) {
         if (aperturaTok != null) { getNextToken(); return; }
         // Mismo criterio que recuperarCuerpoBloque(): si EVALUAR nunca abrio su '{' propia,
-        // esta '}' puede ser la que le tocaba (compensa su apertura faltante) si lo que sigue
-        // es otra '}' o un marcador SINO/CUANDO/PRED — de lo contrario se deja para quien
+        // esta '}' puede ser la que le tocaba, compensa su apertura faltante, si lo que sigue
+        // es otra '}' o un marcador SINO/CUANDO/PRED. De lo contrario se deja para quien
         // envuelve a este EVALUAR.
         int siguiente = getToken(2).kind;
         if (siguiente == SINO || siguiente == CUANDO || siguiente == PRED || siguiente == CIERRE_BLOQUE) getNextToken();
@@ -264,8 +251,8 @@ public class JERCompiler/*@bgen(jjtree)*/implements JERCompilerTreeConstants, JE
     } while (true);
   }
 
-// Raíz del árbol: la devolvemos explícitamente para que quien invoque al parser
-// (por ejemplo ManejadorErrores.ejecutar) pueda quedarse con el AST completo:
+// Raiz del arbol: la devolvemos explicitamente para que quien invoque al parser (por
+// ejemplo ManejadorErrores.ejecutar) pueda quedarse con el AST completo:
 //   JERCompiler parser = new JERCompiler(entrada);
 //   ASTPrograma raiz = parser.Programa();
   final public ASTPrograma Programa() throws ParseException {/*@bgen(jjtree) Programa */
@@ -985,10 +972,10 @@ reportarError(e);
     }
 }
 
-// Antes de la migración, IMP/OBT/TERMINAR consumian sus tokens en linea dentro de
+// Antes de la migracion, IMP/OBT/TERMINAR consumian sus tokens en linea dentro de
 // Sentencia() sin dejar rastro propio en el arbol: la de IMP quedaba como un
 // Expresion()/ValorSimple suelto indistinguible de otros casos, y OBT/TERMINAR
-// desaparecian por completo (ni siquiera el token quedaba registrado en algun nodo).
+// desaparecian por completo, ni siquiera el token quedaba registrado en algun nodo.
 // Se separan en sus propias producciones con nodo para que el analisis semantico
 // pueda identificarlas sin ambiguedad.
   final public void SentenciaImprimir() throws ParseException {/*@bgen(jjtree) SentenciaImprimir */
@@ -1239,7 +1226,7 @@ if (jjtc000) {
     }
 }
 
-// Nodo propio (a diferencia de los operadores aritmeticos, ver comentario de diseño
+// Nodo propio, a diferencia de los operadores aritmeticos (ver comentario de diseno
 // arriba): hay un unico punto de uso y el analizador semantico necesita saber sin
 // ambiguedad si fue '->', '+->' o '-->'.
   final public void OperadorAsignacion() throws ParseException {/*@bgen(jjtree) OperadorAsignacion */
@@ -1275,7 +1262,7 @@ if (jjtc000) {
 }
 
 // El tercer hijo (cuando existe) es ambiguo por posicion: puede ser otro ASTEstructuraSi
-// (cadena "SINO SI") o un ASTBloque (rama "SINO" simple), y el AST no lo distingue por sí
+// (cadena "SINO SI") o un ASTBloque (rama "SINO" simple), y el AST no lo distingue por si
 // solo. En vez de que el analizador semantico adivine con instanceof sobre ese hijo, el nodo
 // se etiqueta a si mismo via jjtSetValue()/jjtGetValue() (mecanismo estandar de JJTree, no
 // agrega hijos ni cambia la forma del arbol): null = sin SINO, Boolean.FALSE = SINO con
@@ -1627,12 +1614,11 @@ if (jjtc000) {
     }
 }
 
-// Tambien se usa donde antes solo se aceptaba Expresion() como valor
-// (inicializador de variable/constante, RET, lado derecho de una asignacion):
-// desde que ExpresionRelacional() acepta una Expresion() sola (ver abajo),
-// Condicion() es un superconjunto estricto de Expresion() — cualquier cosa que
-// Expresion() podia matchear, Condicion() tambien, asi que ya no hace falta un
-// wrapper aparte con LOOKAHEAD/backtracking para elegir entre ambas.
+// Tambien se usa donde antes solo se aceptaba Expresion() como valor (inicializador de
+// variable/constante, RET, lado derecho de una asignacion). Desde que ExpresionRelacional()
+// acepta una Expresion() sola (ver abajo), Condicion() es un superconjunto estricto de
+// Expresion(): cualquier cosa que Expresion() podia matchear, Condicion() tambien, asi que
+// ya no hace falta un wrapper aparte con LOOKAHEAD/backtracking para elegir entre ambas.
   final public void Condicion() throws ParseException {
     ExpresionLogica();
 }
@@ -1694,25 +1680,20 @@ if (jjtc000) {
     }
 }
 
-// El segundo Expresion()+OperadorRelacional() es opcional: una Expresion() sola
-// (p. ej. una variable BOO) tambien es una condicion valida por si misma, igual
-// que en la mayoria de los lenguajes (se evalua "su verdad"). La decision de
-// seguir o no es LL(1) normal de 1 token (¿sigue un operador relacional?), sin
-// ambiguedad.
+// El segundo Expresion()+OperadorRelacional() es opcional: una Expresion() sola, por ejemplo
+// una variable BOO, tambien es una condicion valida por si misma. La decision de seguir o no
+// es LL(1) normal de 1 token, segun si sigue un operador relacional.
 //
-// El '(' NO se maneja aqui (a diferencia de antes): un LOOKAHEAD(<APERTURA_PAREN>)
-// de 1 token que commitea "esto es una condicion agrupada" y that's it se rompe en
-// cuanto lo que sigue al ')' es mas aritmetica ("(a + b) * 2 / c" como valor de un
-// RET/asignacion, ver Base()) — ExpresionRelacional() no tiene forma de "seguir"
-// con esa aritmetica una vez que decide que ya termino. Se delega todo parentesis
-// a Base(), que sí vive dentro de la cadena aritmetica normal (Termino/Factor) y
-// puede seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
-// negado fuerza la creacion del nodo cuando hay NOT, aunque no haya operador relacional
-// (arity == 1): sin esto, "MIENTRAS NOT bandera { ... }" perdia el NOT por completo, porque
-// el nodo nunca llegaba a crearse (el Expresion() unico burbujeaba directo al padre) y NOT,
-// al no tener nodo propio, no queda registrado en ningun lado del arbol. Con negado, el nodo
-// se crea igual (con un solo hijo) y el analizador semantico distingue ese caso por la
-// cantidad de hijos (ver AnalizadorSemantico.visit(ASTExpresionRelacional...)).
+// El '(' no se maneja aqui: un LOOKAHEAD de 1 token que commitea "esto es una condicion
+// agrupada" se rompe en cuanto lo que sigue al ')' es mas aritmetica ("(a + b) * 2 / c" como
+// valor de un RET/asignacion), porque ExpresionRelacional() ya no puede seguir esa aritmetica.
+// Se delega todo parentesis a Base(), que si vive en la cadena aritmetica normal y puede
+// seguir encadenando operadores despues de un grupo, sea aritmetico o logico.
+//
+// negado fuerza la creacion del nodo cuando hay NOT, aunque no haya operador relacional: sin
+// esto, "MIENTRAS NOT bandera { ... }" perdia el NOT por completo, porque el Expresion() unico
+// burbujeaba directo al padre y NOT no queda registrado en ningun lado. Con negado, el nodo se
+// crea igual con un solo hijo, y el analizador semantico distingue el caso por esa cantidad.
   final public void ExpresionRelacional() throws ParseException {/*@bgen(jjtree) #ExpresionRelacional( negado || jjtree . nodeArity ( ) > 1) */
                                                                                       ASTExpresionRelacional jjtn000 = new ASTExpresionRelacional(JJTEXPRESIONRELACIONAL);
                                                                                       boolean jjtc000 = true;
@@ -1767,7 +1748,7 @@ if (jjtc000) {
     }
 }
 
-// Nodo propio: unico punto de uso, sin ambiguedad de posicion (ver comentario de diseño).
+// Nodo propio: unico punto de uso, sin ambiguedad de posicion (ver comentario de diseno).
   final public void OperadorRelacional() throws ParseException {/*@bgen(jjtree) OperadorRelacional */
   ASTOperadorRelacional jjtn000 = new ASTOperadorRelacional(JJTOPERADORRELACIONAL);
   boolean jjtc000 = true;
@@ -1988,11 +1969,11 @@ if (jjtc000) {
     }
 }
 
-// El paréntesis se resuelve aquí (no en ExpresionRelacional(), ver comentario ahí)
-// usando Condicion() en vez de Expresion(): '(' es unico entre las alternativas de
-// Base(), asi que no hace falta LOOKAHEAD — una vez dentro, Condicion() ya cubre
-// tanto una sub-expresion aritmetica agrupada ("(a + b) * 2") como una condicion
-// agrupada ("(a > b) AND c"), sin ambiguedad, porque es un superconjunto estricto.
+// El parentesis se resuelve aqui, no en ExpresionRelacional() (ver comentario ahi), usando
+// Condicion() en vez de Expresion(): '(' es unico entre las alternativas de Base(), asi que
+// no hace falta LOOKAHEAD. Una vez dentro, Condicion() ya cubre tanto una sub-expresion
+// aritmetica agrupada ("(a + b) * 2") como una condicion agrupada ("(a > b) AND c"), sin
+// ambiguedad, porque es un superconjunto estricto.
   final public void Base() throws ParseException {
     switch ((jj_ntk==-1)?jj_ntk_f():jj_ntk) {
     case RESTA:{
@@ -2671,43 +2652,6 @@ if (jjtc000) {
     finally { jj_save(17, xla); }
   }
 
-  private boolean jj_3_18()
- {
-    if (jj_scan_token(IDENTIFICADOR)) return true;
-    if (jj_scan_token(APERTURA_PAREN)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_null_385_29_16()
- {
-    if (jj_3R_TipoDato_439_5_17()) return true;
-    return false;
-  }
-
-  private boolean jj_3_15()
- {
-    if (jj_scan_token(IDENTIFICADOR)) return true;
-    return false;
-  }
-
-  private boolean jj_3_14()
- {
-    if (jj_scan_token(RET)) return true;
-    return false;
-  }
-
-  private boolean jj_3_13()
- {
-    if (jj_scan_token(TERMINAR)) return true;
-    return false;
-  }
-
-  private boolean jj_3_12()
- {
-    if (jj_scan_token(OBT)) return true;
-    return false;
-  }
-
   private boolean jj_3_11()
  {
     if (jj_scan_token(IMP)) return true;
@@ -2738,7 +2682,7 @@ if (jjtc000) {
     xsp = jj_scanpos;
     if (jj_scan_token(15)) {
     jj_scanpos = xsp;
-    if (jj_3R_null_385_29_16()) return true;
+    if (jj_3R_null_352_29_16()) return true;
     }
     return false;
   }
@@ -2773,7 +2717,7 @@ if (jjtc000) {
     return false;
   }
 
-  private boolean jj_3R_TipoDato_443_5_22()
+  private boolean jj_3R_TipoDato_410_5_22()
  {
     if (jj_scan_token(TIPO_BOO)) return true;
     return false;
@@ -2781,47 +2725,47 @@ if (jjtc000) {
 
   private boolean jj_3_4()
  {
-    if (jj_3R_TipoDato_439_5_17()) return true;
+    if (jj_3R_TipoDato_406_5_17()) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_442_5_21()
+  private boolean jj_3R_TipoDato_409_5_21()
  {
     if (jj_scan_token(TIPO_CAR)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_441_5_20()
+  private boolean jj_3R_TipoDato_408_5_20()
  {
     if (jj_scan_token(TIPO_CAD)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_440_5_19()
+  private boolean jj_3R_TipoDato_407_5_19()
  {
     if (jj_scan_token(TIPO_DEC)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_439_5_18()
+  private boolean jj_3R_TipoDato_406_5_18()
  {
     if (jj_scan_token(TIPO_ENT)) return true;
     return false;
   }
 
-  private boolean jj_3R_TipoDato_439_5_17()
+  private boolean jj_3R_TipoDato_406_5_17()
  {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_TipoDato_439_5_18()) {
+    if (jj_3R_TipoDato_406_5_18()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_440_5_19()) {
+    if (jj_3R_TipoDato_407_5_19()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_441_5_20()) {
+    if (jj_3R_TipoDato_408_5_20()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_442_5_21()) {
+    if (jj_3R_TipoDato_409_5_21()) {
     jj_scanpos = xsp;
-    if (jj_3R_TipoDato_443_5_22()) return true;
+    if (jj_3R_TipoDato_410_5_22()) return true;
     }
     }
     }
@@ -2838,6 +2782,43 @@ if (jjtc000) {
   private boolean jj_3_3()
  {
     if (jj_scan_token(CONST)) return true;
+    return false;
+  }
+
+  private boolean jj_3_18()
+ {
+    if (jj_scan_token(IDENTIFICADOR)) return true;
+    if (jj_scan_token(APERTURA_PAREN)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_null_352_29_16()
+ {
+    if (jj_3R_TipoDato_406_5_17()) return true;
+    return false;
+  }
+
+  private boolean jj_3_15()
+ {
+    if (jj_scan_token(IDENTIFICADOR)) return true;
+    return false;
+  }
+
+  private boolean jj_3_14()
+ {
+    if (jj_scan_token(RET)) return true;
+    return false;
+  }
+
+  private boolean jj_3_13()
+ {
+    if (jj_scan_token(TERMINAR)) return true;
+    return false;
+  }
+
+  private boolean jj_3_12()
+ {
+    if (jj_scan_token(OBT)) return true;
     return false;
   }
 

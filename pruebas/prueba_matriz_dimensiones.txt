@@ -1,0 +1,5 @@
+ENT matriz[2][2] -> [[2,2],[2,2]];
+
+FUN ENT mostrarMatriz(){
+    RET matriz[1][1];
+}

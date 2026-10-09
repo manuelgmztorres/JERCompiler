@@ -20,14 +20,14 @@ final class JERSyntaxHighlighter {
                     + "|(?<NUMBER>\\b\\d+(?:\\.\\d+)?\\b)");
 
     private static Style estiloKeyword, estiloBool, estiloComment, estiloString, estiloNumber, estiloNormal;
-    private static boolean oscuro = false;
+    private static final StyleContext CONTEXTO = new StyleContext();
 
     static {
         aplicarPaleta(false);
     }
 
     private static Style crear(Color color, boolean bold, boolean italic) {
-        Style s = new StyleContext().addStyle(null, null);
+        Style s = CONTEXTO.addStyle(null, null);
         StyleConstants.setForeground(s, color);
         StyleConstants.setBold(s, bold);
         StyleConstants.setItalic(s, italic);
@@ -53,11 +53,8 @@ final class JERSyntaxHighlighter {
     }
 
     static void setModoOscuro(boolean modoOscuro) {
-        oscuro = modoOscuro;
         aplicarPaleta(modoOscuro);
     }
-
-    static boolean isModoOscuro() { return oscuro; }
 
     private JERSyntaxHighlighter() {}
 

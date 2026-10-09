@@ -1,0 +1,4 @@
+CONST ENT uno -> 1;
+FUN VACIO imprimirUno(){
+    IMP uno;
+}
