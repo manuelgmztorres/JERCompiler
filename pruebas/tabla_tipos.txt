@@ -1,0 +1,11 @@
+TABLA DE TIPOS - JERCompiler
+Archivo: pruebas\prueba_luis.txt
+Nombre               | Categoria  | Tipo   | Dimensiones | Ambito           | Linea  | Usado | Parametros
+----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
+main                 | funcion    | VACIO  | 0           | GLOBAL           | 1      | no    | []
+positivo             | variable   | ENT    | 0           | main             | 2      | si    | 
+negativo             | variable   | ENT    | 0           | main             | 3      | si    | 
+ceros                | variable   | ENT    | 0           | main             | 4      | si    | 
+i                    | variable   | ENT    | 0           | main             | 6      | si    | 
+numero               | variable   | ENT    | 0           | main             | 8      | si    | 
+--------------------------------------------

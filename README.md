@@ -2,6 +2,8 @@
 
 JERCompiler es un analizador léxico, sintáctico y semántico desarrollado con JavaCC/JJTree para un lenguaje general en español. Valida la estructura gramatical del programa, genera una tabla de tokens y verifica tipos, ámbitos y demás reglas semánticas sobre el AST resultante; no genera código ejecutable.
 
+> **En desarrollo:** además del compilador, `ide/` tiene un IDE mínimo en Swing para escribir y compilar código JER sin terminal — ver `ide/README.md`. Sigue en progreso, no es el foco de esta guía.
+
 ## Sintaxis principal
 
 ```jer
@@ -56,27 +58,46 @@ Reglas que aplica:
 
 ## Compilación y Ejecución
 
-### Solo quiero probar archivos (no voy a tocar el código)
+**Todo se ejecuta parado en la raíz del proyecto (`JERCompiler\`)** — nunca dentro de `analizador\` ni `build\`. La carpeta de salida (`build\`) y la ruta de `pruebas\tabla_tokens.txt`/`tabla_tipos.txt` están resueltas relativas a ese directorio, así que correr algo desde otro lado produce carpetas duplicadas o rutas rotas (ver el detalle en `COMPILACION.md`).
 
-Los comandos de esta sección se ejecutan **desde la raíz del proyecto** (no dentro de `build\`), para que la tabla de tokens se guarde en `pruebas\tabla_tokens.txt` y no en una copia separada dentro de `build\`.
+### Ejecutar el compilador sobre un archivo
 
-El repositorio ya trae las clases compiladas en `build\`. Basta con ejecutar el analizador sobre el archivo que quieras revisar:
+Este es el único comando de ejecución que existe, y es siempre el mismo — no importa si acabas de clonar el repo o si acabas de recompilar algo:
 
 ```powershell
 java -cp build JERCompiler pruebas\prueba_valida.txt
 ```
 
-Esto imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `pruebas\tabla_tokens.txt` con la tabla de tokens del archivo analizado. `pruebas\prueba_semantica_valida.txt` (0 errores esperados) y `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirven como referencia rápida de qué reglas semánticas aplica el analizador.
+Imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `pruebas\tabla_tokens.txt`. Si el archivo compiló con **0 errores**, además imprime en consola y guarda en `pruebas\tabla_tipos.txt` la tabla de símbolos (nombre, categoría, tipo, aridad, línea, parámetros) que armó el analizador semántico — con errores no se publica, porque el análisis pudo haberse cortado a medias (declaraciones nunca alcanzadas) y mostrarla daría una idea equivocada de lo que el programa realmente declara. `pruebas\prueba_semantica_valida.txt` (0 errores esperados) y `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirven como referencia rápida de qué reglas semánticas aplica el analizador.
 
-### Voy a modificar el código (gramática, manejador de errores o analizador semántico)
+El repositorio ya trae las clases compiladas en `build\`, así que **si no vas a tocar el código, esto es todo lo que necesitas** — no hace falta nada de lo que sigue abajo.
 
-Desde la migración a JJTree, la gramática fuente es `analizador\JERCompiler_JJTree.jjt` (el antiguo `analizador\JERCompiler.jj` ya no se usa). Regenerar requiere tres pasos, no uno solo — ver `COMPILACION.md` para el detalle completo (por qué son tres pasos, notas de PowerShell, cuándo hace falta borrar los `AST*.java` generados). Resumen, parado en `analizador\`:
+### Si modificaste código, recompila antes de ejecutar
 
-```powershell
-jjtree -OUTPUT_DIRECTORY:..\build JERCompiler_JJTree.jjt
-javacc -OUTPUT_DIRECTORY:..\build ..\build\JERCompiler_JJTree.jj
-javac -d ..\build ..\build\*.java ManejadorErrores.java TablaSimbolos.java AnalizadorSemantico.java
-java -cp ..\build JERCompiler ..\pruebas\prueba_valida.txt
+Los comandos de abajo usan `jjtree ...`/`javacc ...` directo, como si fueran programas instalados — pero JavaCC/JJTree en realidad se distribuyen como un solo `.jar` (`javacc-7.0.13.jar`), sin ningún `jjtree.exe`/`javacc.exe` de por medio. Windows no sabe qué hacer con `jjtree` a secas a menos que exista, en alguna carpeta de tu PATH, un archivo `jjtree.bat` que internamente llame al `.jar` correcto. Ese archivo es un wrapper de una sola línea:
+
+```bat
+@echo off
+java -cp C:\javacc\javacc-7.0.13.jar jjtree %*
 ```
 
-Si el cambio es solo en `TablaSimbolos.java`, `AnalizadorSemantico.java` o `ManejadorErrores.java` (no en la gramática), alcanza con el paso de `javac` de arriba.
+(y otro `javacc.bat` igual, cambiando `jjtree` por `javacc`). En esta máquina esos dos `.bat` ya existen en `C:\javacc`, y esa carpeta está en el PATH — por eso `jjtree ...`/`javacc ...` funcionan directo más abajo.
+
+**Es puramente una comodidad, no un requisito.** En cualquier máquina donde esos `.bat` no existan (o donde JavaCC esté instalado en otra ruta), usa siempre la forma larga en su lugar — funciona igual, sin necesidad de crear nada:
+
+```powershell
+java -cp C:\javacc\javacc-7.0.13.jar jjtree analizador\JERCompiler_JJTree.jjt
+java -cp C:\javacc\javacc-7.0.13.jar javacc build\JERCompiler_JJTree.jj
+```
+
+Si quieres los comandos cortos ahí también, crea los dos `.bat` de arriba (ajustando la ruta al `.jar` si está en otro lado) en cualquier carpeta que ya esté en tu PATH.
+
+Cualquier cambio en el código —gramática o los tres `.java` de mano— se recompila corriendo siempre estos tres pasos completos, en este orden: primero los dos que regeneran el parser y el AST a partir de la gramática (`jjtree`, `javacc`), y al final el que compila todo con `javac`. No hace falta decidir si tu cambio "califica" para saltarte algún paso — es más simple y más seguro repetir el proceso completo que arriesgarte a que un paso salteado deje algo desactualizado (`COMPILACION.md` documenta qué pasos se pueden omitir en casos específicos, para quien quiera optimizarlo):
+
+```powershell
+jjtree analizador\JERCompiler_JJTree.jjt
+javacc build\JERCompiler_JJTree.jj
+javac -d build build\*.java analizador\*.java
+```
+
+Después de cualquiera de los dos casos de arriba, vuelve a **"Ejecutar el compilador sobre un archivo"** para probar el resultado.

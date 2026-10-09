@@ -92,6 +92,9 @@ FUN VACIO controlDeFlujo(ENT limite) {
         # 11. Tipo del caso CUANDO incompatible con el tipo de la expresion evaluada (ENT vs CAD).
         CUANDO "diez":
             IMP "diez";
+        # 24. CUANDO duplicado: el valor 5 ya aparecio arriba en este mismo EVALUAR.
+        CUANDO 5:
+            IMP "cinco de nuevo";
         PRED:
             IMP "otro";
     }
@@ -154,4 +157,38 @@ FUN VACIO principal() {
 
     # 23. '++' sobre un tipo no numerico (etiqueta es CAD).
     etiqueta++;
+
+    # 25. Tamano de literal de arreglo distinto al tamano declarado (declarado 3, literal con 2).
+    ENT tope[3] -> [1, 2];
+
+    # 26. Profundidad de anidamiento de mas: declarado 1-D, literal anidado en 2 niveles.
+    ENT plano[2] -> [[1, 2], [3, 4]];
+
+    # 27. Profundidad de anidamiento de menos: declarado 2-D, literal plano (sin anidar).
+    DEC matrizMal[2][2] -> [1.0, 2.0];
+
+    # 29. Usar una funcion no-VACIO como valor sin llamarla (le falta "()").
+    activo -> incrementar;
+
+    # 30. Operador de orden (>) entre dos valores no numericos del mismo tipo (CAD).
+    SI etiqueta > "resultado" {
+        IMP "nunca deberia compilar limpio";
+    }
+}
+
+# 28. Funcion no-VACIO donde no todos los caminos terminan en RET (SI sin SINO).
+FUN ENT quizasRetorna(ENT x) {
+    SI x > 0 {
+        RET 1;
+    }
+}
+
+# 31. EVALUAR sin PRED: aunque todos los CUANDO retornen, no cubre el caso por defecto.
+FUN ENT sinPred(ENT n) {
+    EVALUAR n {
+        CUANDO 1:
+            RET 10;
+        CUANDO 2:
+            RET 20;
+    }
 }

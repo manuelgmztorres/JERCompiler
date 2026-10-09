@@ -1,0 +1,11 @@
+ENT i -> 12;
+DEC i -> 13.56728
+
+FUN VACIO mostrarValorI(){
+    IMP "El valor de i es: " + i;
+}
+
+FUN ENT prueba(){
+    ENT suma -> 15 + 3.5;
+    RET suma;
+}
