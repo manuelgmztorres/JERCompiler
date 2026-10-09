@@ -15,6 +15,7 @@ FUN VACIO main(){
             positivo +-> 1;
         } SINO {
             ceros +-> 1;
+            suma -> positivo + positivo;
         }
 
     }

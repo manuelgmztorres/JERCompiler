@@ -1,38 +1,11 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: pruebas/prueba_valida.txt
+Archivo: pruebas\prueba_luis.txt
 Nombre               | Categoria  | Tipo   | Dimensiones | Ambito           | Linea  | Usado | Parametros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
-PI                   | constante  | DEC    | 0           | GLOBAL           | 7      | no    | 
-SALUDO               | constante  | CAD    | 0           | GLOBAL           | 8      | si    | 
-MODO_DEBUG           | constante  | BOO    | 0           | GLOBAL           | 9      | no    | 
-contador             | variable   | ENT    | 0           | GLOBAL           | 11     | si    | 
-factor               | variable   | DEC    | 0           | GLOBAL           | 12     | si    | 
-mensaje              | variable   | CAD    | 0           | GLOBAL           | 13     | no    | 
-letra                | variable   | CAR    | 0           | GLOBAL           | 14     | no    | 
-activo               | variable   | BOO    | 0           | GLOBAL           | 15     | si    | 
-vector               | variable   | ENT    | 1           | GLOBAL           | 17     | si    | 
-matriz               | variable   | DEC    | 2           | GLOBAL           | 18     | si    | 
-factorial            | funcion    | ENT    | 0           | GLOBAL           | 21     | si    | [ENT]
-calcular             | funcion    | DEC    | 0           | GLOBAL           | 30     | si    | [DEC, DEC]
-evaluarNota          | funcion    | VACIO  | 0           | GLOBAL           | 38     | si    | [ENT]
-controlDeFlujo       | funcion    | VACIO  | 0           | GLOBAL           | 53     | si    | [ENT]
-entradaSalida        | funcion    | VACIO  | 0           | GLOBAL           | 76     | si    | []
-contarHastaCero      | funcion    | VACIO  | 0           | GLOBAL           | 86     | si    | [ENT]
-clasificar           | funcion    | VACIO  | 0           | GLOBAL           | 95     | si    | [ENT]
-principal            | funcion    | ENT    | 0           | GLOBAL           | 107    | no    | []
-n                    | parametro  | ENT    | 0           | factorial        | 21     | si    | 
-base                 | parametro  | DEC    | 0           | calcular         | 30     | si    | 
-exponente            | parametro  | DEC    | 0           | calcular         | 30     | si    | 
-potencia             | variable   | DEC    | 0           | calcular         | 31     | si    | 
-raiz                 | variable   | DEC    | 0           | calcular         | 32     | si    | 
-residuo              | variable   | DEC    | 0           | calcular         | 33     | si    | 
-nota                 | parametro  | ENT    | 0           | evaluarNota      | 38     | si    | 
-limite               | parametro  | ENT    | 0           | controlDeFlujo   | 53     | si    | 
-i                    | variable   | ENT    | 0           | controlDeFlujo   | 54     | si    | 
-j                    | variable   | ENT    | 0           | controlDeFlujo   | 62     | si    | 
-lectura              | variable   | ENT    | 0           | entradaSalida    | 77     | si    | 
-inicio               | parametro  | ENT    | 0           | contarHastaCero  | 86     | si    | 
-i                    | variable   | ENT    | 0           | contarHastaCero  | 87     | si    | 
-nota                 | parametro  | ENT    | 0           | clasificar       | 95     | si    | 
-resultado            | variable   | DEC    | 0           | principal        | 111    | si    | 
+main                 | funcion    | VACIO  | 0           | GLOBAL           | 1      | no    | []
+positivo             | variable   | ENT    | 0           | main             | 2      | si    | 
+negativo             | variable   | ENT    | 0           | main             | 3      | si    | 
+ceros                | variable   | ENT    | 0           | main             | 4      | si    | 
+i                    | variable   | ENT    | 0           | main             | 6      | si    | 
+numero               | variable   | ENT    | 0           | main             | 8      | si    | 
 --------------------------------------------
