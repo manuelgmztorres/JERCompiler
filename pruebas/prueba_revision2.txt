@@ -1,0 +1,15 @@
+# Revision 2: condicional SI / SINO y ciclo MIENTRAS.
+FUN VACIO principal() {
+    ENT n -> 5;
+    SI n > 3 {
+        IMP "n es mayor que 3";
+    } SINO {
+        IMP "n es menor o igual que 3";
+    }
+
+    ENT i -> 1;
+    MIENTRAS i <= n {
+        IMP i;
+        i++;
+    }
+}

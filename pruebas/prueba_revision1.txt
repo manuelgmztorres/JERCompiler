@@ -1,0 +1,13 @@
+# Revision 1: variables, operaciones aritmeticas, una funcion con retorno y salida.
+FUN ENT sumar(ENT a, ENT b) {
+    RET a + b;
+}
+
+FUN VACIO principal() {
+    ENT x -> 7;
+    ENT y -> 5;
+    IMP "Suma: " + sumar(x, y);
+    IMP "Producto: " + x * y;
+    DEC promedio -> 7.5 / 2.0;
+    IMP promedio;
+}

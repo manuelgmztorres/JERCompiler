@@ -2,9 +2,9 @@
 /*@egen*//*
  * Colaboradores: Manuel Gomez, Luis Eduardo Hernandez Morales, Angel Horacio.
  *
- * Migracion de JERCompiler.jj (JavaCC puro) a JERCompiler.jjt (JJTree). El AST resultante
- * alimenta el analisis semantico posterior; la logica de manejo y recuperacion de errores no
- * cambio, sigue operando sobre el stream de tokens via getToken()/getNextToken().
+ * Gramatica de JER escrita en JJTree (sobre JavaCC). El AST resultante
+ * alimenta el analisis semantico posterior; la logica de manejo y recuperacion de errores
+ * opera sobre el stream de tokens via getToken()/getNextToken().
  *
  * Decisiones de diseno:
  *
@@ -41,7 +41,7 @@ options {
                       
                                                                                      
                                                                                     
-                                                                                           
+                                                                           
                                                                                      
                                
                                     

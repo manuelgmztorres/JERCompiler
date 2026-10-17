@@ -192,3 +192,49 @@ FUN ENT sinPred(ENT n) {
             RET 20;
     }
 }
+
+
+# Errores de ejecucion que ya se ven al compilar porque el operando es un literal.
+FUN VACIO erroresDeEjecucionEvidentes() {
+    ENT v[3] -> [1, 2, 3];
+    ENT m[2][3] -> [[1, 2, 3], [4, 5, 6]];
+
+    # 32. Division entre cero con el literal 0 como divisor.
+    ENT a -> 10 / 0;
+
+    # 33. Modulo con divisor 0.
+    ENT b -> 10 % 0;
+
+    # 34. Division decimal entre el literal 0.0.
+    DEC k -> 1.0 / 0.0;
+
+    # 35. Raiz de indice 0.
+    ENT c -> 8 // 0;
+
+    # 36. Potencia de ENT con exponente negativo (no daria un entero).
+    ENT d -> 2 ** -1;
+
+    # 37. Indice igual al tamano del arreglo (los indices van de 0 a 2).
+    ENT e -> v[3];
+
+    # 38. Indice negativo.
+    ENT f -> v[-1];
+
+    # 39. Indice fuera de rango en la segunda dimension de una matriz.
+    ENT g -> m[1][3];
+
+    # 40. Escritura fuera de rango.
+    v[5] -> 1;
+
+    # 41. Tamano de arreglo cero.
+    ENT sinElementos[0];
+
+    # 42. Tamano de arreglo negativo.
+    ENT negativo[-2];
+
+    # VALIDOS: lo que depende de valores calculados se decide al ejecutar, no al compilar.
+    ENT cero -> 0;
+    ENT h -> 5 / cero;
+    ENT i -> v[cero];
+    DEC j -> 2.0 ** -1.0;
+}

@@ -3,7 +3,7 @@ import java.util.*;
 /**
  * Colaboradores: Manuel Gomez, Luis Eduardo Hernandez Morales, Angel Horacio.
  *
- * Tabla de simbolos con scope por bloque (ver decision-scoping-tabla-simbolos). Un unico
+ * Tabla de simbolos con scope por bloque. Un unico
  * Scope global comparte namespace entre funciones y variables/constantes; cada funcion y
  * cada bloque anidado abre su propio Scope hijo. declarar() solo choca contra el scope
  * actual, nunca contra un padre, asi que el shadowing de un global por un local siempre es
@@ -38,6 +38,10 @@ public final class TablaSimbolos {
     // resuelve este simbolo desde un uso real (no desde el procesamiento de su propia
     // declaracion) - ver comentario en marcarUsado().
     public boolean usado = false;
+    // true solo mientras AnalizadorSemantico visita el inicializador (o las dimensiones) de la
+    // propia declaracion de este simbolo: sirve para rechazar "ENT x -> x;", que leeria un
+    // valor que todavia no existe.
+    public boolean enInicializacion = false;
 
     public Simbolo(String nombre, Categoria categoria, TipoDato tipo, int aridadArreglo,
                     List<TipoDato> tiposParametros, Token declaracion, int[] tamanios, String ambito) {

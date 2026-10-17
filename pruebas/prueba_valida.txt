@@ -104,7 +104,7 @@ FUN VACIO clasificar(ENT nota) {
     }
 }
 
-FUN ENT principal() {
+FUN VACIO principal() {
     IMP SALUDO;
     controlDeFlujo(5);
     evaluarNota(9);
@@ -114,5 +114,4 @@ FUN ENT principal() {
     entradaSalida();
     contarHastaCero(3);
     clasificar(80);
-    RET 0;
 }

@@ -1,0 +1,51 @@
+# Decisiones previas a la generacion de codigo intermedio.
+# Cada caso INVALIDO produce exactamente 1 error; los VALIDO, ninguno. Total esperado: 8 errores.
+
+CONST ENT LIMITE -> 3;
+
+# VALIDO: un global puede usar otro global declarado antes.
+ENT base -> 10;
+ENT doble -> base * 2;
+
+# INVALIDO 1: global usado antes de su declaracion.
+ENT adelantado -> posterior;
+ENT posterior -> 1;
+
+# INVALIDO 2: global usado en su propio inicializador.
+ENT propio -> propio;
+
+# INVALIDO 7: llamada a funcion en el inicializador de un global.
+ENT conLlamada -> uno();
+
+FUN ENT uno() {
+    RET 1;
+}
+
+# INVALIDO 8: principal debe ser VACIO (aqui devuelve ENT). Ese error se reporta en la linea de la funcion.
+FUN ENT principal() {
+    # VALIDO: arreglo con literal, variable simple, variable sin valor y arreglo sin inicializador.
+    ENT vector[3] -> [1, 2, 3];
+    ENT simple -> 5;
+    ENT sinValor;
+    ENT libre[3];
+
+    # INVALIDO 3: arreglo inicializado con un valor simple.
+    ENT arregloMal[3] -> 5;
+
+    # INVALIDO 4: variable simple inicializada con un literal de arreglo.
+    ENT escalarMal -> [1, 2];
+
+    # INVALIDO 5: variable local usada en su propio inicializador.
+    ENT yo -> yo;
+
+    # INVALIDO 6: el paso de REPETIR modifica una constante.
+    REPETIR (ENT i -> 0; i < 3; LIMITE++) {
+        IMP(i);
+    }
+
+    # VALIDO: el paso modifica la variable de control.
+    REPETIR (ENT j -> 0; j < 3; j++) {
+        IMP(j);
+    }
+    RET 0;
+}

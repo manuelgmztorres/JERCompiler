@@ -17,13 +17,16 @@ import java.util.*;
  * antes de afirmar que un token esta mal ubicado, nunca disparar solo por identidad de token.
  */
 public final class ManejadorErrores implements JERCompilerConstants {
+  /** Carpeta (en la raiz del proyecto) donde se escriben los archivos que genera cada compilacion. */
+  private static final String CARPETA_SALIDA = "salida";
   private static final String ARCHIVO_TABLA = resolverRutaTabla();
 
   /**
-   * Calcula la ruta de tabla_tokens.txt independiente del cwd desde el que se invoque "java".
-   * En vez de una ruta relativa "pruebas/..." (que Java resuelve contra el cwd del proceso),
-   * ubica el directorio de las clases compiladas ("build") y asume que "pruebas" es su
+   * Calcula la ruta de salida/tabla_tokens.txt independiente del cwd desde el que se invoque
+   * "java". En vez de una ruta relativa "salida/..." (que Java resuelve contra el cwd del
+   * proceso), ubica el directorio de las clases compiladas ("build") y asume que "salida" es su
    * carpeta hermana en la raiz del proyecto. Si no se puede determinar, cae a la ruta relativa.
+   * Las demas tablas (tipos, codigo intermedio) se escriben en esa misma carpeta.
    */
   private static String resolverRutaTabla() {
     try {
@@ -31,12 +34,12 @@ public final class ManejadorErrores implements JERCompilerConstants {
           ManejadorErrores.class.getProtectionDomain().getCodeSource().getLocation().toURI());
       File raizProyecto = origenClases.isDirectory() ? origenClases.getParentFile() : null;
       if (raizProyecto != null) {
-        return new File(raizProyecto, "pruebas" + File.separator + "tabla_tokens.txt").getPath();
+        return new File(raizProyecto, CARPETA_SALIDA + File.separator + "tabla_tokens.txt").getPath();
       }
     } catch (Exception ignorada) {
       // Fallback abajo.
     }
-    return "pruebas" + File.separator + "tabla_tokens.txt";
+    return CARPETA_SALIDA + File.separator + "tabla_tokens.txt";
   }
 
   /** Maximo de errores reportados antes de detener el diagnostico. */
@@ -91,16 +94,27 @@ public final class ManejadorErrores implements JERCompilerConstants {
     validarComentariosBloque(contenido);
     System.out.println("JERCompiler -- " + nombre);
     AnalizadorSemantico analizador = null;
+    ASTPrograma raiz = null;
     try {
-      ASTPrograma raiz = new JERCompiler(new ByteArrayInputStream(contenido), "UTF-8").Programa();
+      raiz = new JERCompiler(new ByteArrayInputStream(contenido), "UTF-8").Programa();
       // El modo panico (ultimoIndiceReportado) solo debe suprimir cascadas DENTRO de la fase
       // sintactica que acaba de terminar. La fase semantica es un recorrido nuevo, separado, del
       // AST completo: puede (y suele) reportar errores en tokens anteriores al ultimo error
       // sintactico visto (p. ej. una declaracion global con tipo incompatible, seguida mas abajo
       // de un error de sintaxis) y esos NO son una cascada retrograda que haya que descartar.
+      // Con errores lexicos o sintacticos el AST puede estar incompleto (la recuperacion descarta
+      // funciones enteras), asi que ahi "falta principal" seria un falso positivo: solo se exige
+      // cuando el archivo se parseo sin errores.
+      boolean parseoLimpio = errores.isEmpty();
       ultimoIndiceReportado = -1;
       analizador = new AnalizadorSemantico();
       analizador.analizar(raiz);
+      if (parseoLimpio) {
+        // Este error no pertenece a ninguna posicion del archivo (va en la linea 1): sin
+        // reiniciar el modo panico, quedaria "antes" de los errores ya reportados y se descartaria.
+        ultimoIndiceReportado = -1;
+        analizador.validarPuntoDeEntrada();
+      }
     }
     catch (ParseException e) { reportarError(e); }
     catch (TokenMgrError e) { reportarErrorLexico(e); }
@@ -114,7 +128,10 @@ public final class ManejadorErrores implements JERCompilerConstants {
     // Solo con 0 errores: una iteracion con errores puede haber dejado la tabla de simbolos a
     // medio llenar (declaraciones nunca alcanzadas tras un error de sintaxis), y publicarla
     // igual daria una falsa sensacion de "esto es lo que declaraste" cuando no lo es.
-    if (JERCompiler.totalErrores == 0 && analizador != null) guardarTablaDeTipos(nombre, analizador.obtenerTabla());
+    if (JERCompiler.totalErrores == 0 && analizador != null) {
+      guardarTablaDeTipos(nombre, analizador.obtenerTabla());
+      if (raiz != null) generarCodigoIntermedio(nombre, raiz, analizador.obtenerTabla());
+    }
   }
 
   private static void reiniciar() {
@@ -253,7 +270,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
       "Use exactamente " + declarada + " índice(s): " + nombre + corchetes(declarada) + ".", true));
   }
 
-  /** La condicion de SI/MIENTRAS/REPETIR/HACER/una cadena AND-OR no dio tipo BOO (ver decision-condicion-boo-estricta: sin truthy). */
+  /** La condicion de SI/MIENTRAS/REPETIR/HACER/una cadena AND-OR no dio tipo BOO (sin truthy). */
   public static void reportarCondicionNoBooleana(Token token, TablaSimbolos.TipoDato tipo) {
     registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
       "la condición debe ser de tipo BOO (se encontró " + tipo + ").",
@@ -291,6 +308,98 @@ public final class ManejadorErrores implements JERCompilerConstants {
     registrar(new ErrorJER("ERROR SEMÁNTICO", id.beginLine, id.beginColumn,
       "no se puede modificar '" + nombre + "': es una constante (CONST).",
       "Si necesita cambiar su valor, declare '" + nombre + "' sin CONST.", true));
+  }
+
+  /** Un arreglo declarado cuyo inicializador no es un literal '[...]' (por ejemplo un valor simple). */
+  public static void reportarArregloRequiereLiteral(Token token, String nombre, int dimensiones) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' se declaró con " + dimensiones + " dimensión(es), pero su inicializador no es un literal de arreglo.",
+      "Inicialícelo con un literal entre corchetes, por ejemplo '-> [1, 2, 3]', o elimine el inicializador.", true));
+  }
+
+  /** Una variable simple (sin dimensiones) inicializada con un literal de arreglo '[...]'. */
+  public static void reportarLiteralArregloEnEscalar(Token token, String nombre) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' es una variable simple, pero se inicializa con un literal de arreglo.",
+      "Agregue las dimensiones al declararla (por ejemplo '" + nombre + "[2]') o inicialícela con un solo valor.", true));
+  }
+
+  /** "ENT x -> x;": el identificador se usa dentro de su propio inicializador, cuando todavia no tiene valor. */
+  public static void reportarUsoEnPropioInicializador(Token id) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' no puede usarse en su propio inicializador; todavía no tiene valor.",
+      "Use otro valor, o declare '" + id.image + "' sin inicializador y asígnele el valor después.", true));
+  }
+
+  /** Un global usado en el inicializador de otro global declarado antes que el: el orden de inicializacion es el de declaracion. */
+  public static void reportarGlobalUsadoAntesDeDeclarar(Token id, int lineaDeclaracion) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", id.beginLine, id.beginColumn,
+      "'" + id.image + "' se declara más abajo (línea " + lineaDeclaracion + "); los globales se inicializan en el orden en que se declaran.",
+      "Mueva la declaración de '" + id.image + "' antes de esta línea, o use un valor literal.", true));
+  }
+
+  /** '/' o '%' con el literal 0 como divisor. */
+  public static void reportarDivisionPorCero(Token operador) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
+      "'" + operador.image + "' con divisor 0: la división entre cero no está definida.",
+      "Use un divisor distinto de cero.", true));
+  }
+
+  /** '//' con el literal 0 como indice de la raiz. */
+  public static void reportarRaizDeIndiceCero(Token operador) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
+      "'//' con índice 0: la raíz de índice 0 no está definida.",
+      "Use un índice de raíz mayor que 0.", true));
+  }
+
+  /** '**' entre enteros con un exponente literal negativo: el resultado no seria entero. */
+  public static void reportarExponenteNegativoEnEntero(Token operador) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
+      "un ENT elevado a un exponente negativo no da un entero.",
+      "Use valores DEC (por ejemplo '2.0 ** -1.0') o un exponente mayor o igual que 0.", true));
+  }
+
+  /** Indice literal negativo en un acceso a arreglo. */
+  public static void reportarIndiceNegativo(Token indice, String arreglo) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", indice.beginLine, indice.beginColumn,
+      "el índice de '" + arreglo + "' es negativo; los índices empiezan en 0.",
+      "Use un índice entre 0 y el tamaño del arreglo menos 1.", true));
+  }
+
+  /** Indice literal mayor o igual que el tamano literal declarado de esa dimension. */
+  public static void reportarIndiceFueraDeRango(Token indice, String arreglo, long valor, int tamano, int dimension, int totalDimensiones) {
+    String donde = totalDimensiones > 1 ? " en la dimensión " + dimension : "";
+    registrar(new ErrorJER("ERROR SEMÁNTICO", indice.beginLine, indice.beginColumn,
+      "el índice " + valor + " está fuera del rango de '" + arreglo + "'" + donde + " (tamaño " + tamano + ", índices 0 a " + (tamano - 1) + ").",
+      "Use un índice entre 0 y " + (tamano - 1) + ", o aumente el tamaño del arreglo.", true));
+  }
+
+  /** Dimension literal de un arreglo menor o igual que 0. */
+  public static void reportarTamanioDeArregloNoPositivo(Token dimension) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", dimension.beginLine, dimension.beginColumn,
+      "el tamaño de un arreglo debe ser mayor que 0.",
+      "Escriba un tamaño entero positivo, por ejemplo 'ENT v[3];'.", true));
+  }
+
+  /** Llamada a funcion dentro del inicializador (o las dimensiones) de una declaracion global. */
+  public static void reportarLlamadaEnInicializadorGlobal(Token id) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", id.beginLine, id.beginColumn,
+      "no se puede llamar a la función '" + id.image + "' en el inicializador de un global; los globales se inicializan antes de ejecutar 'principal'.",
+      "Use un valor literal u otro global ya declarado, o asigne el valor dentro de 'principal'.", true));
+  }
+
+  /** No existe ningun simbolo llamado 'principal': el programa no tiene punto de entrada. */
+  public static void reportarFaltaPrincipal() {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", 1, 1,
+      "falta la función 'principal', que es el punto de entrada del programa.",
+      "Agregue 'FUN VACIO principal() { ... }' al programa.", true));
+  }
+
+  /** 'principal' existe pero no es una funcion sin parametros de tipo VACIO. */
+  public static void reportarPrincipalInvalida(Token token) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "'principal' debe ser una función sin parámetros y de tipo VACIO para servir de punto de entrada.",
+      "Declárela como 'FUN VACIO principal() { ... }'.", true));
   }
 
   public static void reportarUsoDeFuncionVacioComoValor(Token id) {
@@ -521,8 +630,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
 
     // La capa 2 (contexto estructural de RET/SINO/CUANDO/PRED) se elimino: esos 4 casos ya
     // se reportan por llamada directa desde la gramatica (reportarRetornoFueraFuncion() /
-    // reportarTokenFueraDeContexto(), ver SentenciaInvalida()/ElementoGlobalInvalido()/
-    // SentenciaRetorno() en JERCompiler.jj) antes de que puedan generar una ParseException
+    // reportarTokenFueraDeContexto(), en SentenciaInvalida()/ElementoGlobalInvalido()/
+    // SentenciaRetorno() de la gramatica) antes de que puedan generar una ParseException
     // real. Si uno de estos tokens llega aqui, es victima colateral de otra excepcion, por
     // ejemplo un bloque sin cerrar, y la capa 4 (expectedTokenSequences) ya lo diagnostica
     // correctamente sin adivinar por identidad de token.
@@ -608,8 +717,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
       // 3l: dos valores seguidos sin operador entre ellos (falta un operador, o una llamada
       // sin parentesis). Unico solape real con la capa 4 (falta ';'): esInicioDeValor y
       // esInicioDeSentencia solo comparten IDENTIFICADOR. Si el identificador que sigue
-      // arranca a su vez una AsignacionOLlamada valida (ver JERCompiler_JJTree.jjt:
-      // IDENTIFICADOR seguido de '->'/'+->'/'-->'/'('/'++'/'--'/'['), no es un valor suelto:
+      // arranca a su vez una AsignacionOLlamada valida
+      // (IDENTIFICADOR seguido de '->'/'+->'/'-->'/'('/'++'/'--'/'['), no es un valor suelto:
       // es la sentencia siguiente, a la que solo le falta el ';' anterior. En ese caso se
       // cede el diagnostico a la capa 4.
       if (anterior.kind == IDENTIFICADOR && esInicioDeValor(token.kind)
@@ -906,6 +1015,30 @@ public final class ManejadorErrores implements JERCompilerConstants {
     try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(salida), StandardCharsets.UTF_8))) {
       writer.print(texto);
     } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar la tabla de tipos: " + e.getMessage()); }
+  }
+
+  private static final String ARCHIVO_CUADRUPLOS = ARCHIVO_TABLA.replace("tabla_tokens.txt", "cuadruplos.txt");
+
+  /** Con 0 errores: genera la tabla de cuadruplos, la imprime y la guarda junto a las demas tablas. */
+  private static void generarCodigoIntermedio(String nombreArchivo, ASTPrograma raiz, TablaSimbolos simbolos) {
+    GeneradorCodigo generador = new GeneradorCodigo(simbolos);
+    TablaCuadruplos cuadruplos = generador.generar(raiz);
+    String texto = cuadruplos.formatear(nombreArchivo);
+    System.out.println(texto);
+    if (!generador.noSoportado().isEmpty()) {
+      System.out.println("[ADVERTENCIA] El código intermedio está incompleto: aún no se traduce " + String.join(", ", generador.noSoportado()) + ".");
+    }
+
+    File salida = new File(ARCHIVO_CUADRUPLOS), directorio = salida.getParentFile(); if (directorio != null && !directorio.exists()) directorio.mkdirs();
+    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(salida), StandardCharsets.UTF_8))) {
+      writer.print(texto);
+    } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar el código intermedio: " + e.getMessage()); }
+
+    // El listado en instrucciones (la misma tabla, mas facil de leer) solo se guarda en su archivo.
+    File listado = new File(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cod_tres_dir.txt"));
+    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(listado), StandardCharsets.UTF_8))) {
+      writer.print(cuadruplos.formatearListado(nombreArchivo));
+    } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar el listado: " + e.getMessage()); }
   }
 
   private static String formatearTablaDeTipos(String nombreArchivo, TablaSimbolos tabla) {

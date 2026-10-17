@@ -1,9 +1,0 @@
-CAD hola -> "Hola";
-CAD mundo -> "Mundo";
-
-FUN VACIO pruebaFuncion(){
-    BOO bandera -> VERDADERO;
-    HACER{
-        IMP hola + mundo;
-    }MIENTRAS (bandera = VERDADERO);
-}

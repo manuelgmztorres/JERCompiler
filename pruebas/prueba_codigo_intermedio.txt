@@ -1,0 +1,193 @@
+# Codigo intermedio: un grupo por funcion (linea recta, llamadas y arreglos, control de flujo,
+# EVALUAR y TERMINAR, AND y OR), y principal las llama todas. Debe dar 0 errores.
+ENT total -> 0;
+CONST DEC PI -> 3.14;
+CAD saludo;
+ENT tabla[3] -> [10, 20, 30];
+
+FUN ENT doble(ENT n) {
+    RET n * 2;
+}
+
+FUN ENT sumar(ENT a, ENT b) {
+    RET a + b;
+}
+
+FUN VACIO avisar(CAD texto) {
+    IMP(texto);
+}
+
+# --- Linea recta: declaraciones, expresiones, asignaciones, IMP y OBT ---
+FUN VACIO lineaRecta() {
+    ENT x -> 4;
+    ENT y -> x * 2 + 1;
+    IMP(y);
+    ENT z -> (x + y) * (x - y);
+    z +-> 2;
+    z --> x;
+    z++;
+    DEC d -> PI;
+    d--;
+    BOO b -> NOT x < y;
+    BOO c -> x != y;
+    ENT n -> -x + 1;
+    ENT p -> x ** 2 // 2;
+    CAD s -> "Total: " + z;
+    s +-> "!";
+    CAD t -> ("a") + 1;
+    ENT total -> 5;
+    ENT libre;
+    OBT libre;
+    IMP libre;
+    x -> x;
+}
+
+# --- Llamadas (anidadas, como sentencia y en expresiones), arreglos y matrices ---
+FUN VACIO llamadasYArreglos() {
+    ENT x -> sumar(doble(1), 2);
+    avisar("hola");
+    doble(x);
+    IMP sumar(x, 1) + 1;
+    DEC m[2][2] -> [[1.1, 2.2], [3.3, 4.4]];
+    ENT n -> 4;
+    ENT v[n + 1];
+    ENT k -> x - 3;
+    v[0] -> 7;
+    v[x] +-> 2;
+    m[1][0]++;
+    m[k][0] --> 1.5;
+    ENT y -> v[0] + tabla[k];
+    DEC z -> m[1][1];
+}
+
+# --- Control de flujo: SI / SINO, MIENTRAS, HACER, REPETIR ---
+FUN VACIO siSino() {
+    ENT x -> 5;
+    SI x > 0 { IMP("positivo"); } SINO { IMP("negativo"); }
+}
+
+FUN VACIO mientras() {
+    ENT i -> 0;
+    MIENTRAS (i < 3) { IMP(i); i++; }
+}
+
+FUN VACIO hacer() {
+    ENT i -> 3;
+    HACER { i--; } MIENTRAS (i > 0);
+}
+
+FUN VACIO repetir() {
+    REPETIR (ENT j -> 0; j < 3; j++) { IMP(j); }
+}
+
+# Cada rama hace su propio RET: hay que agregar un RET de cierre para que el salto al final exista.
+FUN ENT signo(ENT n) {
+    SI n > 0 { RET 1; } SINO SI n < 0 { RET 0 - 1; } SINO { RET 0; }
+}
+
+# Anidados, SI sin SINO dentro de un bucle y dos REPETIR con la misma variable (la segunda pasa a i_2).
+FUN VACIO anidados(ENT n) {
+    REPETIR (ENT i -> 0; i < n; i +-> 2) {
+        REPETIR (ENT k -> 0; k < i; k++) {
+            SI k = 1 { IMP(k); }
+        }
+    }
+    REPETIR (ENT i -> 0; i < 2; i++) { IMP(i); }
+}
+
+# --- EVALUAR (sin caida) y TERMINAR ---
+FUN VACIO mostrar(ENT n) {
+    EVALUAR n {
+        CUANDO 1: IMP("a");
+        CUANDO 2: IMP("b");
+        PRED:     IMP("c");
+    }
+}
+
+FUN VACIO cortar() {
+    ENT i -> 0;
+    MIENTRAS (i < 10) {
+        SI i = 5 { TERMINAR; }
+        i++;
+    }
+}
+
+# Sin PRED, un caso vacio, varias sentencias por caso y un EVALUAR sobre CAD.
+FUN VACIO sinPred(CAD op, ENT n) {
+    EVALUAR op {
+        CUANDO "suma":
+        CUANDO "mas": n++; IMP(n);
+        CUANDO "resta": n--;
+    }
+}
+
+# TERMINAR dentro de un EVALUAR que esta dentro de un bucle: solo sale del EVALUAR.
+FUN VACIO anidado() {
+    REPETIR (ENT i -> 0; i < 3; i++) {
+        EVALUAR i {
+            CUANDO 0: TERMINAR; IMP("no se imprime");
+            CUANDO 1: IMP("uno");
+            PRED:
+        }
+        IMP(i);
+    }
+}
+
+# Todos los casos hacen RET: hace falta el RET de cierre.
+FUN ENT valor(ENT n) {
+    EVALUAR n {
+        CUANDO 1: RET 10;
+        PRED: RET 20;
+    }
+}
+
+# --- AND y OR en cortocircuito ---
+FUN VACIO simple() {
+    ENT a -> 1;
+    ENT b -> 2;
+    BOO r -> a > 0 AND b > 0;
+    IMP(r);
+}
+
+FUN VACIO cadenas(BOO p, BOO q, BOO s) {
+    BOO y -> p AND q AND s;
+    BOO o -> p OR q OR s;
+}
+
+# Sin precedencia entre AND y OR: se evalua de izquierda a derecha, (p OR q) AND s.
+FUN VACIO mixta(BOO p, BOO q, BOO s) {
+    BOO m -> p OR q AND s;
+}
+
+# El primer operando es una variable (se copia) y el destino se lee en el segundo operando.
+FUN VACIO destino(BOO flag, ENT x) {
+    BOO f -> flag;
+    f -> x > 0 AND f;
+    BOO g -> (x > 0 OR x < 10) AND NOT f;
+}
+
+FUN VACIO condiciones(ENT n) {
+    SI n > 0 AND n < 10 { IMP("rango"); }
+    MIENTRAS (n > 0 OR n = 0) { n--; }
+}
+
+FUN VACIO principal() {
+    lineaRecta();
+    llamadasYArreglos();
+    siSino();
+    mientras();
+    hacer();
+    repetir();
+    IMP signo(5);
+    anidados(3);
+    mostrar(1);
+    cortar();
+    sinPred("suma", 2);
+    anidado();
+    IMP valor(1);
+    simple();
+    cadenas(VERDADERO, FALSO, VERDADERO);
+    mixta(VERDADERO, FALSO, VERDADERO);
+    destino(VERDADERO, 3);
+    condiciones(5);
+}

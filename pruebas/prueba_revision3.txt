@@ -1,0 +1,16 @@
+# Revision 3: arreglo global, ciclo REPETIR y funcion que devuelve un valor.
+ENT notas[3] -> [80, 90, 100];
+
+FUN ENT total() {
+    ENT suma -> 0;
+    REPETIR (ENT i -> 0; i < 3; i++) {
+        suma +-> notas[i];
+    }
+    RET suma;
+}
+
+FUN VACIO principal() {
+    ENT t -> total();
+    IMP "Total: " + t;
+    IMP "Promedio: " + t / 3;
+}

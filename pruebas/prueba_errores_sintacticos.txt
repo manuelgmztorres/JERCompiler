@@ -36,3 +36,36 @@ FUN VACIO operadoresIncompletos() {
 
 # --- Elemento faltante detectado por las reglas generales de respaldo ---
 ENT numero -> ,0;
+
+
+# --- Falta el tipo de retorno antes del nombre de la funcion ---
+FUN sinTipoDeRetorno() {
+    RET 1;
+}
+
+# --- VACIO no es un tipo de dato valido para una variable ---
+VACIO variableVacia;
+
+# --- Falta ')' al cerrar los parametros de una funcion ---
+FUN ENT sinCierre(ENT a, ENT b {
+    RET a + b;
+}
+
+# --- Falta '(' al abrir los parametros ---
+FUN VACIO sinApertura ENT n) {
+    IMP "sin parentesis de apertura";
+}
+
+# --- Un ')' de mas deja la condicion incompleta ---
+FUN VACIO parentesisDeMas(ENT a, ENT b) {
+    ENT c -> a + b) * 2;
+}
+
+# --- EVALUAR sin cerrar, interrumpido por la siguiente funcion ---
+FUN VACIO evaluarSinCerrar(ENT n) {
+    EVALUAR n {
+        CUANDO 1: IMP "a";
+
+FUN VACIO ultimaFuncion() {
+    IMP "completa";
+}
