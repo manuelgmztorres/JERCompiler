@@ -116,6 +116,92 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     try { long valor = Long.parseLong(t.image); return negativo ? -valor : valor; } catch (NumberFormatException e) { return null; }
   }
 
+  // Mensajes de tipos incompatibles
+
+  /** Largo maximo con el que se cita un operando en un mensaje; uno mas largo se recorta con "...". */
+  private static final int LARGO_MAXIMO_CITA = 40;
+
+  /** El texto del nodo tal como se escribio: sus tokens, con un espacio donde el fuente los separaba. */
+  private static String textoDe(Node nodo) {
+    Token t = ((SimpleNode) nodo).jjtGetFirstToken(), ultimo = ((SimpleNode) nodo).jjtGetLastToken();
+    StringBuilder s = new StringBuilder();
+    Token anterior = null;
+    for (int i = 0; t != null && i < 200; i++) {
+      if (anterior != null && (t.beginLine != anterior.endLine || t.beginColumn > anterior.endColumn + 1)) s.append(' ');
+      s.append(t.image);
+      if (t == ultimo) break;
+      anterior = t;
+      t = t.next;
+    }
+    return s.length() <= LARGO_MAXIMO_CITA ? s.toString() : s.substring(0, LARGO_MAXIMO_CITA - 3) + "...";
+  }
+
+  /** true si el nodo es solo el nombre de una variable o constante (sin indices ni llamada). */
+  private static boolean esNombreSimple(Node nodo) {
+    return nodo instanceof ASTValorSimple && nodo.jjtGetNumChildren() == 0
+        && ((SimpleNode) nodo).jjtGetFirstToken().kind == IDENTIFICADOR;
+  }
+
+  /** `valor` si es un entero literal; si es un literal de arreglo, su primer entero literal; si no, null. */
+  private static Node enteroLiteralDentro(Node valor) {
+    if (enteroLiteral(valor) != null) return valor;
+    if (valor instanceof ASTLiteralArreglo) {
+      for (int i = 0; i < valor.jjtGetNumChildren(); i++) {
+        Node encontrado = enteroLiteralDentro(valor.jjtGetChild(i));
+        if (encontrado != null) return encontrado;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * `valor` (de tipo `encontrado`) va donde se esperaba `esperado`: una inicializacion, asignacion,
+   * retorno, argumento o caso de EVALUAR. Si se esperaba DEC y el valor es un entero literal (o un
+   * literal de arreglo de enteros), el mensaje dice como escribirlo en DEC; `queSeEsperaba` explica
+   * ese DEC ("'n3' es DEC"). En cualquier otro caso, el mensaje general de tipos incompatibles.
+   */
+  private static void reportarValorDeOtroTipo(Node valor, TablaSimbolos.TipoDato esperado, TablaSimbolos.TipoDato encontrado, String queSeEsperaba) {
+    Node literal = esperado == TablaSimbolos.TipoDato.DEC && encontrado == TablaSimbolos.TipoDato.ENT ? enteroLiteralDentro(valor) : null;
+    if (literal != null) {
+      ManejadorErrores.reportarEnteroDondeSeEsperaDecimal(((SimpleNode) literal).jjtGetFirstToken(), String.valueOf(enteroLiteral(literal)), queSeEsperaba);
+    } else {
+      ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) valor).jjtGetFirstToken(), esperado, encontrado);
+    }
+  }
+
+  /**
+   * Los operandos de una cadena (`a + b - c`, los dos lados de una comparacion, los elementos de un
+   * literal de arreglo) deben ser del mismo tipo, sin conversion ENT<->DEC. El tipo de referencia es
+   * el de la mayoria; en un empate, el del primero, salvo que el primero sea un entero literal frente
+   * a un DEC (`2 + x`): ahi lo distinto es el literal. Cada operando de otro tipo se reporta por su
+   * nombre, o, si es un entero literal donde va DEC, con la forma correcta de escribirlo. `resto` dice
+   * contra que se compara ("el resto de la operación"). Devuelve el tipo comun, o null si no lo hay.
+   */
+  private static TablaSimbolos.TipoDato exigirMismoTipo(List<Node> operandos, List<TablaSimbolos.TipoDato> tipos, String resto) {
+    if (tipos.isEmpty()) return null;
+    Map<TablaSimbolos.TipoDato, Integer> cuenta = new EnumMap<TablaSimbolos.TipoDato, Integer>(TablaSimbolos.TipoDato.class);
+    for (TablaSimbolos.TipoDato t : tipos) cuenta.merge(t, 1, Integer::sum);
+    TablaSimbolos.TipoDato referencia = tipos.get(0);
+    if (cuenta.size() == 1) return referencia;
+    for (TablaSimbolos.TipoDato t : tipos) if (cuenta.get(t) > cuenta.get(referencia)) referencia = t;
+    if (referencia == TablaSimbolos.TipoDato.ENT && enteroLiteral(operandos.get(0)) != null
+        && cuenta.getOrDefault(TablaSimbolos.TipoDato.DEC, 0).equals(cuenta.get(TablaSimbolos.TipoDato.ENT))) {
+      referencia = TablaSimbolos.TipoDato.DEC;
+    }
+    for (int i = 0; i < operandos.size(); i++) {
+      TablaSimbolos.TipoDato tipo = tipos.get(i);
+      if (tipo == referencia) continue;
+      Node operando = operandos.get(i);
+      Token donde = ((SimpleNode) operando).jjtGetFirstToken();
+      if (referencia == TablaSimbolos.TipoDato.DEC && tipo == TablaSimbolos.TipoDato.ENT && enteroLiteral(operando) != null) {
+        ManejadorErrores.reportarEnteroDondeSeEsperaDecimal(donde, String.valueOf(enteroLiteral(operando)), resto + " es DEC");
+      } else {
+        ManejadorErrores.reportarOperandoDeOtroTipo(donde, textoDe(operando), tipo, resto, referencia, esNombreSimple(operando));
+      }
+    }
+    return null;
+  }
+
   /** true si el nodo es el literal 0 o 0.0 (con o sin signo). */
   private static boolean esCeroLiteral(Node nodo) {
     if (nodo instanceof ASTUnaryMinus && nodo.jjtGetNumChildren() == 1) nodo = nodo.jjtGetChild(0);
@@ -279,60 +365,93 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       return;
     }
     if (esDuenaDelSimbolo && tipoInicializador != null && tipoInicializador != simbolo.tipo) {
-      ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) inicializador).jjtGetFirstToken(), simbolo.tipo, tipoInicializador);
+      reportarValorDeOtroTipo(inicializador, simbolo.tipo, tipoInicializador, "'" + simbolo.nombre + "' es " + simbolo.tipo);
     }
   }
 
+  /** Texto con el que los mensajes de una cadena aritmetica nombran a los demas operandos. */
+  private static final String RESTO_OPERACION = "el resto de la operación";
+
   /**
    * Regla comun a ASTExpresion/ASTTermino/ASTFactor (+/-, * / %, ** //): todos los operandos
-   * deben ser del mismo tipo (sin coercion ENT<->DEC) y
-   * ese tipo debe admitir aritmetica (ENT o DEC). Si algun operando ya devolvio null (error mas
-   * abajo), no se reporta un segundo error encima: se corta en silencio.
+   * deben ser del mismo tipo (sin coercion ENT<->DEC; ver exigirMismoTipo(), que nombra el operando
+   * distinto) y ese tipo debe admitir aritmetica (ENT o DEC). Si algun operando ya devolvio null
+   * (error mas abajo), no se reporta un segundo error encima: se corta en silencio.
    */
   private TablaSimbolos.TipoDato tipoCadenaAritmetica(SimpleNode node, Object data) {
-    TablaSimbolos.TipoDato tipoAcumulado = null;
+    List<Node> operandos = new ArrayList<Node>();
+    List<TablaSimbolos.TipoDato> tipos = new ArrayList<TablaSimbolos.TipoDato>();
     boolean huboError = false;
     for (int i = 0; i < node.jjtGetNumChildren(); i++) {
       Node hijo = node.jjtGetChild(i);
       TablaSimbolos.TipoDato tipoHijo = (TablaSimbolos.TipoDato) hijo.jjtAccept(this, data);
       if (tipoHijo == null) { huboError = true; continue; }
-      if (tipoAcumulado == null) {
-        tipoAcumulado = tipoHijo;
-      } else if (tipoAcumulado != tipoHijo) {
-        ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) hijo).jjtGetFirstToken(), tipoAcumulado, tipoHijo);
-        huboError = true;
-      }
+      operandos.add(hijo);
+      tipos.add(tipoHijo);
       if (i > 0) validarOperandoDerechoLiteral(node.jjtGetChild(i - 1), hijo, tipoHijo);
     }
-    if (huboError || tipoAcumulado == null) return null;
-    if (tipoAcumulado != TablaSimbolos.TipoDato.ENT && tipoAcumulado != TablaSimbolos.TipoDato.DEC) {
-      ManejadorErrores.reportarOperandoNoNumerico(node.jjtGetFirstToken(), tipoAcumulado);
+    TablaSimbolos.TipoDato tipoComun = exigirMismoTipo(operandos, tipos, RESTO_OPERACION);
+    if (huboError || tipoComun == null) return null;
+    if (tipoComun != TablaSimbolos.TipoDato.ENT && tipoComun != TablaSimbolos.TipoDato.DEC) {
+      ManejadorErrores.reportarOperandoNoNumerico(node.jjtGetFirstToken(), tipoComun);
       return null;
     }
-    return tipoAcumulado;
+    return tipoComun;
   }
 
   /**
    * Regla de ASTExpresion (+/-): igual que tipoCadenaAritmetica(), pero '+' ademas concatena
    * si cualquiera de los dos lados es CAD; el resultado de esa
    * concatenacion es CAD, sea cual sea el otro tipo. '-' nunca acepta CAD, ni tampoco '+' cuando
-   * ninguno de los dos lados es CAD (ahi rige la regla numerica estricta de siempre).
+   * ninguno de los dos lados es CAD (ahi rige la regla numerica estricta de siempre). Primero se
+   * visitan todos los operandos; sin ningun CAD, la cadena se revisa como una aritmetica cualquiera.
    */
   private TablaSimbolos.TipoDato tipoExpresion(ASTExpresion node, Object data) {
-    TablaSimbolos.TipoDato acumulado = null;
+    List<Node> operandos = new ArrayList<Node>();
+    List<Integer> posiciones = new ArrayList<Integer>(); // indice de cada operando entre los hijos del nodo
+    List<TablaSimbolos.TipoDato> tipos = new ArrayList<TablaSimbolos.TipoDato>();
     boolean huboError = false;
     for (int i = 0; i < node.jjtGetNumChildren(); i++) {
       Node hijo = node.jjtGetChild(i);
       TablaSimbolos.TipoDato tipoHijo = (TablaSimbolos.TipoDato) hijo.jjtAccept(this, data);
       if (tipoHijo == null) { huboError = true; continue; }
-      if (acumulado == null) { acumulado = tipoHijo; continue; }
-      Token operador = operadorDespuesDe(node.jjtGetChild(i - 1));
+      operandos.add(hijo);
+      posiciones.add(i);
+      tipos.add(tipoHijo);
+    }
+    if (operandos.isEmpty()) return null;
+
+    if (!tipos.contains(TablaSimbolos.TipoDato.CAD)) {
+      TablaSimbolos.TipoDato tipoComun = exigirMismoTipo(operandos, tipos, RESTO_OPERACION);
+      if (tipoComun == null) return null;
+      if (tipoComun != TablaSimbolos.TipoDato.ENT && tipoComun != TablaSimbolos.TipoDato.DEC) {
+        for (int k = 1; k < operandos.size(); k++) {
+          ManejadorErrores.reportarOperandoNoNumerico(operadorDespuesDe(node.jjtGetChild(posiciones.get(k) - 1)), tipoComun);
+        }
+        return null;
+      }
+      return huboError ? null : tipoComun;
+    }
+
+    // Con algun CAD: de izquierda a derecha, '+' con un CAD de cualquier lado pasa a ser CAD.
+    TablaSimbolos.TipoDato acumulado = tipos.get(0);
+    for (int k = 1; k < operandos.size(); k++) {
+      Node hijo = operandos.get(k);
+      TablaSimbolos.TipoDato tipoHijo = tipos.get(k);
+      Token operador = operadorDespuesDe(node.jjtGetChild(posiciones.get(k) - 1));
       if (operador.kind == SUMA && (acumulado == TablaSimbolos.TipoDato.CAD || tipoHijo == TablaSimbolos.TipoDato.CAD)) {
         acumulado = TablaSimbolos.TipoDato.CAD;
         continue;
       }
+      if (acumulado == TablaSimbolos.TipoDato.CAD || tipoHijo == TablaSimbolos.TipoDato.CAD) {
+        // Un CAD fuera de '+' (p. ej. "x" + 1 - d): el problema es el operador, no el otro tipo.
+        ManejadorErrores.reportarOperandoNoNumerico(operador, TablaSimbolos.TipoDato.CAD);
+        huboError = true;
+        continue;
+      }
       if (acumulado != tipoHijo) {
-        ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) hijo).jjtGetFirstToken(), acumulado, tipoHijo);
+        ManejadorErrores.reportarOperandoDeOtroTipo(((SimpleNode) hijo).jjtGetFirstToken(), textoDe(hijo), tipoHijo,
+            RESTO_OPERACION, acumulado, esNombreSimple(hijo));
         huboError = true;
         continue;
       }
@@ -523,7 +642,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       TablaSimbolos.TipoDato tipoArgumento = (TablaSimbolos.TipoDato) argumento.jjtAccept(this, data);
       TablaSimbolos.TipoDato tipoEsperado = simbolo.tiposParametros.get(i);
       if (tipoArgumento != null && tipoArgumento != tipoEsperado) {
-        ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) argumento).jjtGetFirstToken(), tipoEsperado, tipoArgumento);
+        reportarValorDeOtroTipo(argumento, tipoEsperado, tipoArgumento, "el parámetro " + (i + 1) + " de '" + simbolo.nombre + "' es " + tipoEsperado);
         huboError = true;
       }
     }
@@ -762,7 +881,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       return null;
     }
     if (tipoValor != tipoRetornoFuncionActual) {
-      ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) valor).jjtGetFirstToken(), tipoRetornoFuncionActual, tipoValor);
+      reportarValorDeOtroTipo(valor, tipoRetornoFuncionActual, tipoValor, "la función devuelve " + tipoRetornoFuncionActual);
     }
     return null;
   }
@@ -822,7 +941,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     Node valor = node.jjtGetChild(indiceOperador + 1);
     TablaSimbolos.TipoDato tipoValor = (TablaSimbolos.TipoDato) valor.jjtAccept(this, data);
     if (aridadOk && !esConstante && tipoValor != null && tipoValor != simbolo.tipo) {
-      ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) valor).jjtGetFirstToken(), simbolo.tipo, tipoValor);
+      reportarValorDeOtroTipo(valor, simbolo.tipo, tipoValor, "'" + simbolo.nombre + "' es " + simbolo.tipo);
     }
     return null;
   }
@@ -920,7 +1039,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       Node expresion = node.jjtGetChild(0);
       TablaSimbolos.TipoDato tipoExpr = (TablaSimbolos.TipoDato) expresion.jjtAccept(this, data);
       if (tipoExpr != null && tipoExpr != simbolo.tipo) {
-        ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) expresion).jjtGetFirstToken(), simbolo.tipo, tipoExpr);
+        reportarValorDeOtroTipo(expresion, simbolo.tipo, tipoExpr, "'" + simbolo.nombre + "' es " + simbolo.tipo);
       }
     }
     return null;
@@ -938,7 +1057,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
         Node hijo = caso.valor;
         TablaSimbolos.TipoDato tipoCaso = (TablaSimbolos.TipoDato) hijo.jjtAccept(this, data);
         if (tipoEvaluado != null && tipoCaso != null && tipoEvaluado != tipoCaso) {
-          ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) hijo).jjtGetFirstToken(), tipoEvaluado, tipoCaso);
+          reportarValorDeOtroTipo(hijo, tipoEvaluado, tipoCaso, "la expresión de EVALUAR es " + tipoEvaluado);
         }
         String clave = valorLiteralDeCaso(hijo);
         if (clave != null) {
@@ -1000,7 +1119,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     TablaSimbolos.TipoDato tipoDer = (TablaSimbolos.TipoDato) node.jjtGetChild(2).jjtAccept(this, data);
     if (tipoIzq == null || tipoDer == null) return null;
     if (tipoIzq != tipoDer) {
-      ManejadorErrores.reportarTipoIncompatibleEnOperacion(operador, tipoIzq, tipoDer);
+      exigirMismoTipo(Arrays.asList(node.jjtGetChild(0), node.jjtGetChild(2)), Arrays.asList(tipoIzq, tipoDer), "el otro lado de la comparación");
       return null;
     }
     boolean esIgualdad = operador.kind == IGUAL || operador.kind == DIFERENTE;
@@ -1048,7 +1167,8 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
         dataHijos = new ContextoTamanioArreglo(Arrays.copyOfRange(ctx.tamanios, 1, ctx.tamanios.length), ctx.nivel + 1, ctx.nombre);
       }
     }
-    TablaSimbolos.TipoDato tipoElemento = null;
+    List<Node> elementos = new ArrayList<Node>();
+    List<TablaSimbolos.TipoDato> tipos = new ArrayList<TablaSimbolos.TipoDato>();
     boolean huboError = false;
     for (int i = 0; i < node.jjtGetNumChildren(); i++) {
       Node hijo = node.jjtGetChild(i);
@@ -1066,13 +1186,12 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       }
       TablaSimbolos.TipoDato tipoHijo = (TablaSimbolos.TipoDato) hijo.jjtAccept(this, dataHijos);
       if (tipoHijo == null) { huboError = true; continue; }
-      if (tipoElemento == null) {
-        tipoElemento = tipoHijo;
-      } else if (tipoElemento != tipoHijo) {
-        ManejadorErrores.reportarTipoIncompatibleEnOperacion(((SimpleNode) hijo).jjtGetFirstToken(), tipoElemento, tipoHijo);
-        huboError = true;
-      }
+      elementos.add(hijo);
+      tipos.add(tipoHijo);
     }
+    // Todos los elementos del mismo tipo; si uno difiere se nombra (o se dice como escribirlo en DEC).
+    TablaSimbolos.TipoDato tipoElemento = exigirMismoTipo(elementos, tipos, "el resto del arreglo");
+    if (!tipos.isEmpty() && tipoElemento == null) huboError = true;
     return huboError ? null : anotar(node, tipoElemento, null); // tipoElemento queda null si el literal esta vacio "[]"
   }
 

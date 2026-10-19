@@ -250,6 +250,30 @@ public final class ManejadorErrores implements JERCompilerConstants {
       "JER no convierte tipos automáticamente; use valores del mismo tipo.", true));
   }
 
+  /**
+   * Un operando de una operacion (o un elemento de un literal de arreglo) no es del tipo del resto:
+   * nombra cual es. `operando` es su texto tal como se escribio; `resto` dice contra que se compara,
+   * p. ej. "el resto de la operación". `esVariable` agrega la opcion de cambiar su declaracion.
+   */
+  public static void reportarOperandoDeOtroTipo(Token token, String operando, TablaSimbolos.TipoDato tipoOperando,
+      String resto, TablaSimbolos.TipoDato tipoResto, boolean esVariable) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "tipos incompatibles: '" + operando + "' es " + tipoOperando + ", pero " + resto + " es " + tipoResto + ".",
+      esVariable
+        ? "JER no convierte tipos automáticamente; declare '" + operando + "' como " + tipoResto + " o use solo valores " + tipoResto + "."
+        : "JER no convierte tipos automáticamente; use solo valores " + tipoResto + ".", true));
+  }
+
+  /**
+   * Se esperaba DEC y se escribio un entero literal (`2`): el error mas comun con DEC, asi que el
+   * mensaje dice como escribirlo. `queSeEsperaba` explica el DEC, p. ej. "'n3' es DEC".
+   */
+  public static void reportarEnteroDondeSeEsperaDecimal(Token token, String literal, String queSeEsperaba) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "el valor " + literal + " es ENT, pero " + queSeEsperaba + ".",
+      "Un valor DEC siempre lleva punto decimal: escriba " + literal + ".0 en lugar de " + literal + ".", true));
+  }
+
   /** Un operando de +,-,*,/,%,**,// (o el '-' unario) no es ENT ni DEC. */
   public static void reportarOperandoNoNumerico(Token token, TablaSimbolos.TipoDato tipo) {
     registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
@@ -1086,4 +1110,4 @@ public final class ManejadorErrores implements JERCompilerConstants {
       this.lexema = lexema; this.tipo = tipo; this.kind = kind; this.linea = linea; this.columna = columna;
     }
   }
-}
+}
