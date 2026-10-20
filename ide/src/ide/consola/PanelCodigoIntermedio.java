@@ -17,14 +17,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Las tres vistas del codigo intermedio: "Cuadruplos" (tabla), "Tres direcciones" y "Tabla de simbolos".
+ * Las dos vistas del codigo intermedio: "Cuadruplos" (tabla) y "Tres direcciones".
  * Se llenan con los archivos que el compilador deja en salida/ (carpeta hermana de build/).
  */
 public class PanelCodigoIntermedio {
     /** Una etiqueta de salto (L1, L2...) dentro del codigo de tres direcciones. */
     private static final Pattern PATRON_ETIQUETA = Pattern.compile("\\bL\\d+\\b");
     /** Tolerancia al comparar la fecha de los archivos de salida con el inicio de la compilacion (resolucion del sistema de archivos). */
-    private static final long TOLERANCIA_FECHA_MS = 2000;
+    static final long TOLERANCIA_FECHA_MS = 2000;
     private static final int COL_OPERADOR = 0, COL_RESULTADO = 3;
 
     private final File carpetaSalida;
@@ -39,7 +39,6 @@ public class PanelCodigoIntermedio {
     private final JLabel aviso = new JLabel(); // cantidad de cuadruplos o por que no hay; oculto si esta vacio
     private final JPanel panelCuadruplos = new JPanel(new BorderLayout());
     private final JTextArea areaTresDir = new JTextArea();
-    private final JTextArea areaSimbolos = new JTextArea();
 
     /** `alEstado` recibe los mensajes para la barra de estado. */
     public PanelCodigoIntermedio(File carpetaSalida, Consumer<String> alEstado) {
@@ -76,19 +75,16 @@ public class PanelCodigoIntermedio {
         panelCuadruplos.add(aviso, BorderLayout.NORTH);
         panelCuadruplos.add(scrollTabla, BorderLayout.CENTER);
 
-        for (JTextArea area : new JTextArea[] {areaTresDir, areaSimbolos}) {
-            area.setFont(mono);
-            area.setEditable(false);
-        }
+        areaTresDir.setFont(mono);
+        areaTresDir.setEditable(false);
         instalarSaltoAEtiqueta(areaTresDir);
         aplicarTema(Tema.CLARO);
     }
 
-    /** Agrega las tres vistas como pestanas, en orden: Cuadruplos, Tres direcciones, Tabla de simbolos. */
+    /** Agrega las dos vistas como pestanas, en orden: Cuadruplos, Tres direcciones. */
     public void agregarA(JTabbedPane pestanas) {
         pestanas.addTab("Cuádruplos", panelCuadruplos);
         pestanas.addTab("Tres direcciones", new JScrollPane(areaTresDir));
-        pestanas.addTab("Tabla de símbolos", new JScrollPane(areaSimbolos));
     }
 
     public int cantidadCuadruplos() { return modelo.getRowCount(); }
@@ -105,25 +101,22 @@ public class PanelCodigoIntermedio {
         scrollTabla.getViewport().setBackground(tema.fondoTabla);
         panelCuadruplos.setBackground(tema.fondoPanel);
         aviso.setForeground(tema.textoPanel);
-        for (JTextArea area : new JTextArea[] {areaTresDir, areaSimbolos}) {
-            area.setBackground(tema.fondoConsola);
-            area.setForeground(tema.textoConsola);
-            area.setCaretColor(tema.textoConsola);
-        }
+        areaTresDir.setBackground(tema.fondoConsola);
+        areaTresDir.setForeground(tema.textoConsola);
+        areaTresDir.setCaretColor(tema.textoConsola);
         tabla.repaint();
     }
 
-    /** Vacia las tres vistas y deja `mensaje` sobre la tabla (vacio: sin mensaje). */
+    /** Vacia las dos vistas y deja `mensaje` sobre la tabla (vacio: sin mensaje). */
     public void limpiar(String mensaje) {
         modelo.setRowCount(0);
         aviso.setText(mensaje);
         aviso.setVisible(!mensaje.isBlank());
         areaTresDir.setText("");
-        areaSimbolos.setText("");
     }
 
     /**
-     * Carga salida/cuadruplos.txt, salida/cod_tres_dir.txt y salida/tabla_tipos.txt. El compilador
+     * Carga salida/cuadruplos.txt y salida/cod_tres_dir.txt. El compilador
      * solo los reescribe con 0 errores; con errores conservan los de una compilacion anterior, asi que
      * se cargan solo si la compilacion termino sin errores y los archivos son de esta compilacion.
      * Devuelve true si hay codigo intermedio para mostrar.
@@ -135,7 +128,6 @@ public class PanelCodigoIntermedio {
         }
         File cuadruplos = new File(carpetaSalida, "cuadruplos.txt");
         File tresDir = new File(carpetaSalida, "cod_tres_dir.txt");
-        File tipos = new File(carpetaSalida, "tabla_tipos.txt");
         if (!esDeEstaCompilacion(cuadruplos, inicio) || !esDeEstaCompilacion(tresDir, inicio)) {
             limpiar(" Sin código intermedio: el compilador no generó salida" + File.separator + " en esta compilación.");
             return false;
@@ -146,8 +138,6 @@ public class PanelCodigoIntermedio {
             for (String[] fila : filas) modelo.addRow(fila);
             areaTresDir.setText(LectorCuadruplos.leerTexto(tresDir));
             areaTresDir.setCaretPosition(0);
-            areaSimbolos.setText(esDeEstaCompilacion(tipos, inicio) ? LectorCuadruplos.leerTexto(tipos) : "La tabla de símbolos no se generó en esta compilación.");
-            areaSimbolos.setCaretPosition(0);
             return true;
         } catch (IOException e) {
             limpiar(" No se pudo leer el código intermedio: " + e.getMessage());
@@ -155,7 +145,7 @@ public class PanelCodigoIntermedio {
         }
     }
 
-    private static boolean esDeEstaCompilacion(File f, long inicio) {
+    static boolean esDeEstaCompilacion(File f, long inicio) {
         return f.isFile() && f.lastModified() >= inicio - TOLERANCIA_FECHA_MS;
     }
 

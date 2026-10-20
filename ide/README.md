@@ -28,13 +28,15 @@ Con `-sourcepath`, `javac` compila `JERIde` y todo lo que usa; no hace falta lis
 - **Atajos de edicion**: Ctrl+Z / Ctrl+Y deshacer-rehacer, Ctrl+Shift+Up/Down extiende la seleccion por linea, **Ctrl+/** (o Ctrl+7) comenta/descomenta con `#`, **Tab / Shift+Tab** indentan/desindentan las lineas seleccionadas, **Ctrl+rueda** cambia el tamano de la fuente.
 - **Buscar y reemplazar** (Ctrl+F / Ctrl+H): siguiente, anterior, reemplazar y reemplazar todo (un solo Ctrl+Z lo deshace), sin distinguir mayusculas.
 - **Guardar** (Ctrl+S) y **Guardar como** (Ctrl+Shift+S): el archivo nuevo sugiere `pruebas/` pero se puede elegir cualquier carpeta; se agrega `.txt` si no trae `.txt` ni `.jer`.
-- **Compilar**: guarda si hace falta y corre `java -cp build JERCompiler <archivo>` en segundo plano (timeout de 30 s, la ventana no se congela). La consola tiene las pestanas **Salida** (completa) y **Errores** (solo errores). Clic en un error salta a esa linea y las lineas con error se marcan en rojo en el editor.
-- **Codigo intermedio**: si la compilacion termina con `Errores: 0`, la consola carga lo que el compilador dejo en `salida\`, solo si esos archivos son de esta compilacion (con errores, las pestanas se vacian en vez de mostrar los de una compilacion anterior):
+- **Compilar** (boton o **F5**): guarda si hace falta y corre `java -cp build JERCompiler <archivo>` en segundo plano (timeout de 30 s, la ventana no se congela). Con errores se abre la pestana **Errores**; sin errores la consola se queda en la pestana que estaba abierta (si era Errores, pasa a Salida). Clic en un error lleva el cursor a su linea y columna, y las lineas con error se marcan en rojo en el editor.
+- **Consola**, en el orden de las etapas del compilador: **Salida** (todo lo que imprimio el compilador), **Errores** (solo errores), **Tokens**, **Tabla de simbolos**, **Cuadruplos** y **Tres direcciones**.
+- **Tokens**: la tabla `No. | Lexema | Token | Linea | Columna` de `tabla_tokens.txt`; se carga en cada compilacion, aun con errores. Doble clic en un token lleva el cursor a su posicion.
+- **Tabla de simbolos y codigo intermedio**: si la compilacion termina con `Errores: 0`, la consola carga lo que el compilador dejo en `salida\`, solo si esos archivos son de esta compilacion (con errores, las pestanas se vacian en vez de mostrar los de una compilacion anterior):
+  - **Tabla de simbolos**: la tabla `Nombre | Categoria | Tipo | Dimensiones | Ambito | Linea | Usado | Parametros` de `tabla_tipos.txt`. Doble clic en un simbolo lleva el cursor a la linea donde se declaro.
   - **Cuadruplos**: la tabla `Operador | Arg1 | Arg2 | Resultado` leida de `cuadruplos.txt`, con la cantidad de cuadruplos arriba, las filas `FUN` y `ETIQ` resaltadas y los saltos en azul. Doble clic en un `SALTO`/`SALTO_VER`/`SALTO_FAL` selecciona su `ETIQ`; doble clic en una `ETIQ` va al siguiente salto que llega a ella.
   - **Tres direcciones**: `cod_tres_dir.txt`; doble clic sobre una etiqueta (`L3`) lleva a la linea `L3:`.
-  - **Tabla de simbolos**: `tabla_tipos.txt`.
-- **Barra de estado**: estado de la compilacion (con el numero de cuadruplos) y `Ln/Col` del cursor. **Limpiar consola** vacia la salida, las vistas del codigo intermedio y las marcas.
-- **Modo oscuro**: editor, numeros de linea, arbol, pestanas, consola, tabla de cuadruplos y resaltado. El tema y los archivos abiertos se recuerdan entre sesiones.
+- **Barra de estado**: estado de la compilacion (con el numero de cuadruplos) y `Ln/Col` del cursor. **Limpiar consola** vacia todas las pestanas y las marcas.
+- **Modo oscuro**: editor, numeros de linea, arbol, pestanas, consola, tablas y resaltado. El tema y los archivos abiertos se recuerdan entre sesiones.
 
 ## Estructura
 
@@ -49,7 +51,8 @@ ide/
    ├─ editor/                      EditorTab, NumeroLineaGutter, JERSyntaxHighlighter, DialogoBuscar
    ├─ proyecto/                    ArbolProyecto
    ├─ compilacion/                 EjecutorCompilador, ResultadoCompilacion
-   └─ consola/                     PanelConsola, PanelCodigoIntermedio, LectorCuadruplos
+   └─ consola/                     PanelConsola, PanelTablas, TablaTexto, LectorTablas,
+                                   PanelCodigoIntermedio, LectorCuadruplos
 ```
 
 | Archivo | Rol |
@@ -63,13 +66,16 @@ ide/
 | `proyecto/ArbolProyecto.java` | Arbol de archivos del proyecto; se refresca conservando las carpetas abiertas. |
 | `compilacion/EjecutorCompilador.java` | Lanza el compilador en un proceso aparte, con timeout, sin congelar la ventana. |
 | `compilacion/ResultadoCompilacion.java` | Separa de la salida los errores, sus lineas y si termino con `Errores: 0` (sin Swing). |
-| `consola/PanelConsola.java` | Pestanas Salida y Errores (clic en un error salta a su linea) y aloja las del codigo intermedio. |
-| `consola/PanelCodigoIntermedio.java` | Pestanas Cuadruplos, Tres direcciones y Tabla de simbolos, con la navegacion de saltos. |
+| `consola/PanelConsola.java` | Pestanas Salida y Errores (clic en un error lleva a su linea y columna) y aloja las demas, en el orden de las etapas. |
+| `consola/PanelTablas.java` | Pestanas Tokens y Tabla de simbolos; doble clic lleva a la posicion del token o a la declaracion del simbolo. |
+| `consola/TablaTexto.java` | Tabla de solo lectura con aviso y tema, usada por Tokens y Tabla de simbolos. |
+| `consola/LectorTablas.java` | Lee `tabla_tokens.txt` y `tabla_tipos.txt` (sin Swing). |
+| `consola/PanelCodigoIntermedio.java` | Pestanas Cuadruplos y Tres direcciones, con la navegacion de saltos. |
 | `consola/LectorCuadruplos.java` | Lee `cuadruplos.txt` cortando las columnas por posicion (sin Swing). |
 
 ### Donde tocar
 
 - **Un color**: solo `Tema.java`.
 - **Una pestana nueva en la consola**: `PanelConsola` (y su indice `TAB_...`).
-- **Cambia el formato de `salida\`**: `LectorCuadruplos` / `PanelCodigoIntermedio`.
+- **Cambia el formato de `salida\`**: `LectorTablas` / `PanelTablas` (tokens y simbolos) o `LectorCuadruplos` / `PanelCodigoIntermedio`.
 - **Cambia como se invoca el compilador o su salida**: `EjecutorCompilador` / `ResultadoCompilacion`.

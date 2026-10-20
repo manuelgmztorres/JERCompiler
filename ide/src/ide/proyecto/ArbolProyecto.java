@@ -14,7 +14,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
-/** Arbol de archivos del proyecto (sin ocultos ni build/); doble clic sobre un archivo lo abre. */
+/**
+ * Arbol de archivos del proyecto; doble clic sobre un archivo lo abre. No muestra archivos ocultos
+ * ni las carpetas de clases compiladas (build/ y ide/clases/), que no se editan a mano.
+ */
 public class ArbolProyecto extends JTree {
     private final File raiz;
 
@@ -47,11 +50,12 @@ public class ArbolProyecto extends JTree {
 
     private static DefaultTreeModel construirModelo(File raiz) {
         DefaultMutableTreeNode nodo = new DefaultMutableTreeNode(raiz);
-        poblar(nodo, raiz);
+        poblar(nodo, raiz, new File(new File(raiz, "ide"), "clases"));
         return new DefaultTreeModel(nodo);
     }
 
-    private static void poblar(DefaultMutableTreeNode nodo, File dir) {
+    /** `clasesIde` es ide/clases/ del proyecto: se oculta solo esa, no cualquier carpeta llamada "clases". */
+    private static void poblar(DefaultMutableTreeNode nodo, File dir, File clasesIde) {
         File[] hijos = dir.listFiles();
         if (hijos == null) return;
         Arrays.sort(hijos, (a, b) -> {
@@ -59,10 +63,10 @@ public class ArbolProyecto extends JTree {
             return a.getName().compareToIgnoreCase(b.getName());
         });
         for (File hijo : hijos) {
-            if (hijo.getName().startsWith(".") || hijo.getName().equals("build")) continue;
+            if (hijo.getName().startsWith(".") || hijo.getName().equals("build") || hijo.equals(clasesIde)) continue;
             DefaultMutableTreeNode nodoHijo = new DefaultMutableTreeNode(hijo);
             nodo.add(nodoHijo);
-            if (hijo.isDirectory()) poblar(nodoHijo, hijo);
+            if (hijo.isDirectory()) poblar(nodoHijo, hijo, clasesIde);
         }
     }
 

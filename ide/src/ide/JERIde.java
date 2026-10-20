@@ -50,7 +50,7 @@ public class JERIde extends JFrame {
     private final FileNameExtensionFilter filtroAbrir = new FileNameExtensionFilter("Archivos JER (*.jer, *.txt)", "jer", "txt");
 
     private final ArbolProyecto arbol = new ArbolProyecto(raizProyecto, this::nuevaPestana);
-    private final PanelConsola consola = new PanelConsola(new File(raizProyecto, "salida"), this::irALineaDeError, this::estado);
+    private final PanelConsola consola = new PanelConsola(new File(raizProyecto, "salida"), this::irA, this::estado);
     private final EjecutorCompilador compilador = new EjecutorCompilador(new File(raizProyecto, "build"));
     private DialogoBuscar dialogoBuscar; // se crea la primera vez que se abre
     private Tema tema = Tema.CLARO;
@@ -76,6 +76,7 @@ public class JERIde extends JFrame {
         btnGuardarComo.addActionListener(e -> conRedDeSeguridad(this::guardarComo));
         btnBuscar.addActionListener(e -> conRedDeSeguridad(this::mostrarBuscar));
         btnCompilar.addActionListener(e -> conRedDeSeguridad(this::compilar));
+        btnCompilar.setToolTipText("Compilar (F5)");
         btnLimpiar.addActionListener(e -> limpiarConsola());
         btnModoOscuro.addActionListener(e -> conRedDeSeguridad(() -> aplicarTema(Tema.de(btnModoOscuro.isSelected()))));
 
@@ -104,6 +105,7 @@ public class JERIde extends JFrame {
         atajo(KeyEvent.VK_S, ctrl | KeyEvent.SHIFT_DOWN_MASK, "guardarComoAtajo", this::guardarComo);
         atajo(KeyEvent.VK_F, ctrl, "buscarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_H, ctrl, "reemplazarAtajo", this::mostrarBuscar);
+        atajo(KeyEvent.VK_F5, 0, "compilarAtajo", () -> { if (btnCompilar.isEnabled()) compilar(); });
 
         pestanas.addChangeListener(e -> actualizarPosicion());
 
@@ -276,9 +278,10 @@ public class JERIde extends JFrame {
         return (EditorTab) pestanas.getSelectedComponent();
     }
 
-    private void irALineaDeError(int linea) {
+    /** Lleva el editor activo a una linea y columna (1-based): desde un error, un token o un simbolo. */
+    private void irA(int linea, int columna) {
         EditorTab tab = pestanaActual();
-        if (tab != null) tab.irALinea(linea);
+        if (tab != null) tab.irA(linea, columna);
     }
 
     // ---------- abrir / guardar ----------
@@ -368,16 +371,20 @@ public class JERIde extends JFrame {
     }
 
     /**
-     * Vuelca la salida y los errores, marca sus lineas en el editor y, si compilo sin errores, carga el
-     * codigo intermedio y la tabla de simbolos de salida/.
+     * Vuelca la salida y los errores, marca sus lineas en el editor y carga las tablas de salida/: la
+     * de tokens siempre; la de simbolos y el codigo intermedio, solo si compilo sin errores.
+     * Con errores se muestra la pestana Errores; sin errores se queda la pestana que estaba abierta
+     * (salvo Errores, que quedaria vacia: ahi se pasa a Salida).
      */
     private void mostrarResultado(EditorTab tab, ResultadoCompilacion r) {
         consola.mostrarResultado(r);
         tab.marcarLineas(r.lineasConError);
 
+        consola.tablas().cargar(r.sinErrores, r.inicio);
         boolean hayCodigo = consola.codigoIntermedio().cargar(r.sinErrores, r.inicio);
         boolean hayErrores = !r.lineasConError.isEmpty();
-        consola.setSelectedIndex(hayErrores ? PanelConsola.TAB_ERRORES : hayCodigo ? PanelConsola.TAB_CUADRUPLOS : PanelConsola.TAB_SALIDA);
+        if (hayErrores) consola.setSelectedIndex(PanelConsola.TAB_ERRORES);
+        else if (consola.getSelectedIndex() == PanelConsola.TAB_ERRORES) consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
         if (hayErrores) estado(" " + r.lineasConError.size() + " linea(s) con error");
         else if (hayCodigo) estado(" Compilacion terminada: " + consola.codigoIntermedio().cantidadCuadruplos() + " cuadruplo(s)");
         else estado(" Compilacion terminada");

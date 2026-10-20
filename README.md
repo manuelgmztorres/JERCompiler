@@ -77,6 +77,9 @@ FUN VACIO principal() {
 
 | Operador | Arg1 | Arg2 | Resultado |
 |---|---|---|---|
+| `FUN` | _inicio |  |  |
+| `LLAMAR` | principal | 0 |  |
+| `RET` |  |  |  |
 | `FUN` | principal |  |  |
 | `ASIG` | 5 |  | n |
 | `>` | n | 3 | t1 |
@@ -97,6 +100,10 @@ FUN VACIO principal() {
 | `RET` |  |  |  |
 
 ```
+FUN _inicio
+        LLAMAR principal, 0
+        RET
+
 FUN principal
         n = 5
         t1 = n > 3
@@ -115,10 +122,11 @@ FUN principal
 
 Cómo se arma:
 * **Operandos:** una constante tal como se escribe en JER, un nombre de variable o parámetro, o un temporal `t1`, `t2`… (reinician en cada función). Una expresión compuesta se descompone en varias filas.
-* **Funciones:** cada una empieza con `FUN nombre` y una fila `RECIBIR` por parámetro, y termina en `RET`. Si el programa tiene variables globales, se inicializan en orden de declaración dentro de una función inicial llamada `_global`.
+* **Arranque:** la tabla siempre empieza con la función `_inicio`, que es el punto de entrada: llama a `_global` (solo si hay variables globales) y después a `principal`; cuando `_inicio` llega a su `RET`, el programa termina. Así el orden de arranque queda escrito en el código intermedio. Los nombres con `_` no chocan con los del programa porque en JER un identificador empieza con letra.
+* **Funciones:** cada una empieza con `FUN nombre` y una fila `RECIBIR` por parámetro, y termina en `RET`. Si el programa tiene variables globales, se inicializan en orden de declaración dentro de la función `_global`.
 * **Saltos:** el destino de un salto es una etiqueta (`L1`, `L2`…) que se marca con una fila `ETIQ` justo antes de la fila destino; así la tabla conserva solo las cuatro columnas de un cuádruplo.
 * **Llamadas:** una fila `PARAM` por argumento (todos se evalúan antes) y una fila `LLAMAR` con la función y la cantidad de argumentos.
-* **Arreglos:** una fila `DIM` por dimensión y una `RESERVAR`; los elementos se leen con `LEER_ELEM` y se escriben con `ASIG_ELEM`.
+* **Arreglos:** una fila `DIM` por dimensión y una `RESERVAR`; los elementos se leen con `LEER_ELEM` y se escriben con `ASIG_ELEM`. En un arreglo de varias dimensiones se aplica un índice por fila: `m[i][j]` es `LEER_ELEM m i t1` y luego `LEER_ELEM t1 j destino`. El `t1` intermedio es una **referencia** a la fila `m[i]`, no una copia, así que `t1[j] = v` (`ASIG_ELEM v j t1`) modifica `m`.
 * **Variables locales con el mismo nombre** en bloques distintos (o que ocultan a un global) se renombran `x`, `x_2`, `x_3` para que no choquen en el listado plano.
 * **Sin optimizaciones** (por ejemplo, sin plegado de constantes), para que el código intermedio refleje el programa fuente. Cada fila guarda en memoria el tipo de su resultado, aunque la tabla impresa no lo muestre.
 
@@ -144,14 +152,15 @@ Operadores de la tabla:
 | `OBT` |  |  | variable | Lee un valor. |
 | `DIM` | operando |  |  | Tamaño de una dimensión del arreglo que se reserva a continuación. |
 | `RESERVAR` | tipo | número de dimensiones | arreglo | Reserva el arreglo; sus elementos toman el valor por defecto del tipo. |
-| `LEER_ELEM` | arreglo | índice | destino | Lee un elemento: `destino = arreglo[índice]`. |
+| `LEER_ELEM` | arreglo | índice | destino | Lee un elemento: `destino = arreglo[índice]`. Si al arreglo le quedan dimensiones (una fila de una matriz), `destino` es una referencia a esa fila, no una copia. |
 | `ASIG_ELEM` | valor | índice | arreglo | Escribe un elemento: `arreglo[índice] = valor`. |
 
 ## Semántica de ejecución
 
 Todavía no hay una etapa que ejecute el código intermedio. Estas son las decisiones que el generador respeta y que cualquier ejecución futura debe cumplir:
 
-* **Punto de entrada:** `FUN VACIO principal()`, sin parámetros, obligatoria. La ejecución parte de ella, después de inicializar los globales.
+* **Punto de entrada:** `FUN VACIO principal()`, sin parámetros, obligatoria. La ejecución empieza en `_inicio` (la primera función de la tabla), que inicializa los globales con `_global` y luego llama a `principal`; el `RET` de `_inicio` termina el programa.
+* **Filas de matrices por referencia:** `LEER_ELEM` sobre una fila de un arreglo de varias dimensiones devuelve una referencia a ella; escribir en esa referencia modifica el arreglo original.
 * **`EVALUAR` sin caída:** solo se ejecuta el caso que coincide y luego se sale del `EVALUAR`. `TERMINAR` dentro de un caso es válido pero redundante.
 * **Variables sin inicializar:** toman un valor por defecto fijo: `ENT` 0, `DEC` 0.0, `CAD` vacía, `CAR` carácter nulo y `BOO` `FALSO`.
 * **`AND` y `OR` en cortocircuito:** en `a AND b`, si `a` es falso no se evalúa `b`; en `a OR b`, si `a` es verdadero no se evalúa `b`. No hay precedencia entre ellos: se evalúan de izquierda a derecha (`a OR b AND c` es `(a OR b) AND c`).

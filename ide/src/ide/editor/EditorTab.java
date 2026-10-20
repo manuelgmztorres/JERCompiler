@@ -315,10 +315,20 @@ public class EditorTab extends JScrollPane {
     }
 
     /** Lleva el caret al inicio de la linea (1-based) y le da el foco al editor. */
-    public void irALinea(int linea) {
+    public void irALinea(int linea) { irA(linea, 1); }
+
+    /**
+     * Lleva el caret a la linea y columna dadas (1-based, como en los mensajes del compilador: cada
+     * caracter, tabulador incluido, cuenta como una columna) y le da el foco al editor. Una columna
+     * fuera de la linea se ajusta al final de esa linea.
+     */
+    public void irA(int linea, int columna) {
         Element raiz = textPane.getDocument().getDefaultRootElement();
         if (linea < 1 || linea > raiz.getElementCount()) return;
-        textPane.setCaretPosition(raiz.getElement(linea - 1).getStartOffset());
+        Element elemento = raiz.getElement(linea - 1);
+        int finDeLinea = Math.max(elemento.getStartOffset(), elemento.getEndOffset() - 1); // sin el salto de linea
+        int destino = Math.min(elemento.getStartOffset() + Math.max(columna, 1) - 1, finDeLinea);
+        textPane.setCaretPosition(destino);
         textPane.requestFocusInWindow();
     }
 

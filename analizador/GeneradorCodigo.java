@@ -5,7 +5,7 @@ import java.util.*;
  *
  * Genera la tabla de cuadruplos recorriendo el AST que ya paso el analisis semantico sin errores.
  * Lee las Anotacion que dejo el analizador (tipo y simbolo de cada nodo), asi que no recalcula
- * nada. Tiene tres partes: el programa (funciones, globales `_global`, sentencias y nombres), las
+ * nada. Tiene tres partes: el programa (arranque `_inicio`, globales `_global`, funciones, sentencias y nombres), las
  * expresiones (con llamadas, arreglos y AND/OR) y el control de flujo (SI, bucles, EVALUAR y
  * TERMINAR).
  *
@@ -26,6 +26,10 @@ import java.util.*;
 public final class GeneradorCodigo implements JERCompilerConstants {
 
   static final String FUNCION_GLOBAL = "_global";
+  /** Punto de entrada de la tabla: llama a `_global` (si hay globales) y a `principal`; su RET termina el programa. */
+  static final String FUNCION_INICIO = "_inicio";
+  /** Nombre de la funcion principal; el analizador semantico ya garantizo que existe, es VACIO y no tiene parametros. */
+  static final String FUNCION_PRINCIPAL = "principal";
 
   final TablaCuadruplos tabla = new TablaCuadruplos();
   private final Deque<List<Integer>> salidas = new ArrayDeque<List<Integer>>(); // salidas de los bloques abiertos (bucles y EVALUAR)
@@ -54,7 +58,9 @@ public final class GeneradorCodigo implements JERCompilerConstants {
   public Set<String> noSoportado() { return Collections.unmodifiableSet(noSoportado); }
 
   public TablaCuadruplos generar(ASTPrograma raiz) {
-    generarGlobales(raiz);
+    List<Node> globales = declaracionesGlobales(raiz);
+    generarInicio(!globales.isEmpty());
+    generarGlobales(globales);
     for (int i = 0; i < raiz.jjtGetNumChildren(); i++) {
       Node hijo = raiz.jjtGetChild(i);
       if (hijo instanceof ASTDeclaracionFuncion) funcion((ASTDeclaracionFuncion) hijo);
@@ -64,13 +70,31 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     return tabla;
   }
 
-  /** Los globales se inicializan en orden de declaracion dentro de la funcion sintetica `_global`; sin globales no se genera. */
-  private void generarGlobales(ASTPrograma raiz) {
+  /**
+   * Primera funcion de la tabla y punto de entrada del programa: el orden de arranque (globales y
+   * despues principal) queda escrito en el codigo intermedio en vez de ser una regla implicita.
+   * Los nombres que empiezan con '_' no pueden chocar con los del programa: un identificador de
+   * JER empieza siempre con letra.
+   */
+  private void generarInicio(boolean hayGlobales) {
+    iniciarFuncion(FUNCION_INICIO);
+    if (hayGlobales) tabla.emitir("LLAMAR", FUNCION_GLOBAL, "0", null, TablaSimbolos.TipoDato.VACIO);
+    tabla.emitir("LLAMAR", FUNCION_PRINCIPAL, "0", null, TablaSimbolos.TipoDato.VACIO);
+    tabla.emitir("RET", null, null, null, null);
+  }
+
+  /** Las declaraciones de variables y constantes globales, en orden de declaracion. */
+  private static List<Node> declaracionesGlobales(ASTPrograma raiz) {
     List<Node> globales = new ArrayList<Node>();
     for (int i = 0; i < raiz.jjtGetNumChildren(); i++) {
       Node hijo = raiz.jjtGetChild(i);
       if (esDeclaracionDeVariable(hijo)) globales.add(hijo);
     }
+    return globales;
+  }
+
+  /** Los globales se inicializan en orden de declaracion dentro de la funcion sintetica `_global`; sin globales no se genera. */
+  private void generarGlobales(List<Node> globales) {
     if (globales.isEmpty()) return;
     iniciarFuncion(FUNCION_GLOBAL);
     for (Node global : globales) declaracion(global, true);
@@ -354,7 +378,10 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     if (nodo.jjtGetNumChildren() > 1) inicializar(nombre, arreglo.tipo, nodo.jjtGetChild(1));
   }
 
-  /** Escribe los elementos de un literal; un sub-literal se baja primero a su fila con `LEER_ELEM`. */
+  /**
+   * Escribe los elementos de un literal; un sub-literal se baja primero a su fila con `LEER_ELEM`.
+   * Esa fila es una REFERENCIA (ver descender()): escribir en ella llena el arreglo original.
+   */
   private void inicializar(String arreglo, TablaSimbolos.TipoDato tipo, Node literal) {
     for (int i = 0; i < literal.jjtGetNumChildren(); i++) {
       Node elemento = literal.jjtGetChild(i);
@@ -417,7 +444,12 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     return indices;
   }
 
-  /** Aplica todos los indices menos el ultimo (`LEER_ELEM m i t1`) y devuelve el operando de la fila resultante. */
+  /**
+   * Aplica todos los indices menos el ultimo (`LEER_ELEM m i t1`) y devuelve el operando de la fila
+   * resultante. Semantica de LEER_ELEM: si lo leido es una fila de un arreglo de varias dimensiones
+   * (faltan indices por aplicar), el destino es una REFERENCIA a esa fila, no una copia; por eso
+   * `t1 = m[i]` seguido de `t1[j] = v` modifica `m`. Solo con el ultimo indice se obtiene un valor.
+   */
   private String descender(String arreglo, String[] indices, TablaSimbolos.TipoDato tipo) {
     for (int i = 0; i < indices.length - 1; i++) {
       String fila = temporal();

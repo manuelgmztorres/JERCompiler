@@ -1110,4 +1110,4 @@ public final class ManejadorErrores implements JERCompilerConstants {
       this.lexema = lexema; this.tipo = tipo; this.kind = kind; this.linea = linea; this.columna = columna;
     }
   }
-}
+}
