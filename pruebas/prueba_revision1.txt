@@ -9,5 +9,5 @@ FUN VACIO principal() {
     IMP "Suma: " + sumar(x, y);
     IMP "Producto: " + x * y;
     DEC promedio -> 7.5 / 2.0;
-    IMP promedio;
+    IMP promedio
 }

@@ -131,6 +131,30 @@ public final class ManejadorErrores implements JERCompilerConstants {
     if (JERCompiler.totalErrores == 0 && analizador != null) {
       guardarTablaDeTipos(nombre, analizador.obtenerTabla());
       if (raiz != null) generarCodigoIntermedio(nombre, raiz, analizador.obtenerTabla());
+    } else if (JERCompiler.totalErrores > 0) {
+      // Si hay errores, se sobrescriben los archivos con el encabezado y el mensaje
+      File salidaCuadruplos = new File(ARCHIVO_CUADRUPLOS);
+      File directorio = salidaCuadruplos.getParentFile(); 
+      if (directorio != null && !directorio.exists()) directorio.mkdirs();
+
+      try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(salidaCuadruplos), StandardCharsets.UTF_8))) {
+        writer.println("TABLA DE CUÁDRUPLOS - JERCompiler");
+        writer.println("Archivo: " + nombre);
+        writer.println();
+        writer.print("Codigo fuente con errores, no se puede generar el código intermedio.");
+      } catch (IOException e) { 
+        System.out.println("[ADVERTENCIA] No se pudo reescribir cuadruplos.txt: " + e.getMessage()); 
+      }
+
+      File listadoTresDir = new File(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cod_tres_dir.txt"));
+      try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(listadoTresDir), StandardCharsets.UTF_8))) {
+        writer.println("CÓDIGO DE TRES DIRECCIONES - JERCompiler");
+        writer.println("Archivo: " + nombre);
+        writer.println();
+        writer.print("Codigo fuente con errores, no se puede generar el código de tres direcciones.");
+      } catch (IOException e) { 
+        System.out.println("[ADVERTENCIA] No se pudo reescribir cod_tres_dir.txt: " + e.getMessage()); 
+      }
     }
   }
 
@@ -1110,4 +1134,4 @@ public final class ManejadorErrores implements JERCompilerConstants {
       this.lexema = lexema; this.tipo = tipo; this.kind = kind; this.linea = linea; this.columna = columna;
     }
   }
-}
+}

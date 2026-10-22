@@ -9,12 +9,12 @@ import java.awt.*;
  * JTextPane (via modelToView), no un JTextArea paralelo: asi no se desalinea aunque las lineas
  * con palabras clave en negrita midan un poco mas alto que las lineas normales.
  */
-class NumeroLineaGutter extends JComponent {
+public class NumeroLineaGutter extends JComponent {
     private final JTextPane textPane;
     private Color colorFondo = new Color(0xF0F0F0);
     private Color colorTexto = Color.GRAY;
 
-    NumeroLineaGutter(JTextPane textPane) {
+    public NumeroLineaGutter(JTextPane textPane) {
         this.textPane = textPane;
         setFont(textPane.getFont());
         textPane.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -31,7 +31,7 @@ class NumeroLineaGutter extends JComponent {
         });
     }
 
-    void setColores(Color fondo, Color texto) {
+    public void setColores(Color fondo, Color texto) {
         this.colorFondo = fondo;
         this.colorTexto = texto;
         repaint();

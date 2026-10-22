@@ -242,4 +242,6 @@ javacc build\JERCompiler_JJTree.jj
 javac -d build build\*.java analizador\*.java
 ```
 
+Los tres pasos están juntos en **`compilar.bat`** (raíz del proyecto; doble clic o desde cualquier carpeta). Usa los `jjtree.bat`/`javacc.bat` del PATH y se detiene en el primer paso que falle.
+
 Después de cualquiera de los dos casos de arriba, vuelve a **"Ejecutar el compilador sobre un archivo"** para probar el resultado.

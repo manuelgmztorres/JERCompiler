@@ -5,7 +5,6 @@ import ide.Tema;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -13,16 +12,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Las dos vistas del codigo intermedio: "Cuadruplos" (tabla) y "Tres direcciones".
+ * Las dos vistas del codigo intermedio: "Cuadruplos" (tabla, pestana de la consola) y el documento de
+ * tres direcciones (DocumentoTresDirecciones, a la derecha del editor).
  * Se llenan con los archivos que el compilador deja en salida/ (carpeta hermana de build/).
  */
 public class PanelCodigoIntermedio {
-    /** Una etiqueta de salto (L1, L2...) dentro del codigo de tres direcciones. */
-    private static final Pattern PATRON_ETIQUETA = Pattern.compile("\\bL\\d+\\b");
     /** Tolerancia al comparar la fecha de los archivos de salida con el inicio de la compilacion (resolucion del sistema de archivos). */
     static final long TOLERANCIA_FECHA_MS = 2000;
     private static final int COL_OPERADOR = 0, COL_RESULTADO = 3;
@@ -38,12 +34,16 @@ public class PanelCodigoIntermedio {
     private final JScrollPane scrollTabla = new JScrollPane(tabla);
     private final JLabel aviso = new JLabel(); // cantidad de cuadruplos o por que no hay; oculto si esta vacio
     private final JPanel panelCuadruplos = new JPanel(new BorderLayout());
-    private final JTextArea areaTresDir = new JTextArea();
+    private final DocumentoTresDirecciones documento;
 
-    /** `alEstado` recibe los mensajes para la barra de estado. */
-    public PanelCodigoIntermedio(File carpetaSalida, Consumer<String> alEstado) {
+    /**
+     * `alEstado` recibe los mensajes para la barra de estado; `alCerrarDocumento` se llama con la "x"
+     * del documento de tres direcciones.
+     */
+    public PanelCodigoIntermedio(File carpetaSalida, Consumer<String> alEstado, Runnable alCerrarDocumento) {
         this.carpetaSalida = carpetaSalida;
         this.alEstado = alEstado;
+        this.documento = new DocumentoTresDirecciones(alEstado, alCerrarDocumento);
 
         Font mono = new Font(Font.MONOSPACED, Font.PLAIN, 13);
         tabla.setFont(mono);
@@ -75,17 +75,16 @@ public class PanelCodigoIntermedio {
         panelCuadruplos.add(aviso, BorderLayout.NORTH);
         panelCuadruplos.add(scrollTabla, BorderLayout.CENTER);
 
-        areaTresDir.setFont(mono);
-        areaTresDir.setEditable(false);
-        instalarSaltoAEtiqueta(areaTresDir);
         aplicarTema(Tema.CLARO);
     }
 
-    /** Agrega las dos vistas como pestanas, en orden: Cuadruplos, Tres direcciones. */
+    /** Agrega la pestana Cuadruplos (el codigo de tres direcciones va aparte, en documento()). */
     public void agregarA(JTabbedPane pestanas) {
         pestanas.addTab("Cuádruplos", panelCuadruplos);
-        pestanas.addTab("Tres direcciones", new JScrollPane(areaTresDir));
     }
+
+    /** El documento de tres direcciones, para colocarlo junto al editor. */
+    public DocumentoTresDirecciones documento() { return documento; }
 
     public int cantidadCuadruplos() { return modelo.getRowCount(); }
 
@@ -101,9 +100,7 @@ public class PanelCodigoIntermedio {
         scrollTabla.getViewport().setBackground(tema.fondoTabla);
         panelCuadruplos.setBackground(tema.fondoPanel);
         aviso.setForeground(tema.textoPanel);
-        areaTresDir.setBackground(tema.fondoConsola);
-        areaTresDir.setForeground(tema.textoConsola);
-        areaTresDir.setCaretColor(tema.textoConsola);
+        documento.aplicarTema(tema);
         tabla.repaint();
     }
 
@@ -112,16 +109,17 @@ public class PanelCodigoIntermedio {
         modelo.setRowCount(0);
         aviso.setText(mensaje);
         aviso.setVisible(!mensaje.isBlank());
-        areaTresDir.setText("");
+        documento.limpiar();
     }
 
     /**
      * Carga salida/cuadruplos.txt y salida/cod_tres_dir.txt. El compilador
      * solo los reescribe con 0 errores; con errores conservan los de una compilacion anterior, asi que
      * se cargan solo si la compilacion termino sin errores y los archivos son de esta compilacion.
+     * `fuente` es el nombre del archivo compilado (subtitulo del documento).
      * Devuelve true si hay codigo intermedio para mostrar.
      */
-    public boolean cargar(boolean sinErrores, long inicio) {
+    public boolean cargar(boolean sinErrores, long inicio, String fuente) {
         if (!sinErrores) {
             limpiar(" Sin código intermedio: el programa tiene errores.");
             return false;
@@ -136,8 +134,7 @@ public class PanelCodigoIntermedio {
             List<String[]> filas = LectorCuadruplos.leer(cuadruplos);
             limpiar(" " + filas.size() + " cuádruplo(s).");
             for (String[] fila : filas) modelo.addRow(fila);
-            areaTresDir.setText(LectorCuadruplos.leerTexto(tresDir));
-            areaTresDir.setCaretPosition(0);
+            documento.mostrar(LectorCuadruplos.leerTexto(tresDir), "salida" + File.separator + tresDir.getName() + "  ·  " + fuente);
             return true;
         } catch (IOException e) {
             limpiar(" No se pudo leer el código intermedio: " + e.getMessage());
@@ -191,47 +188,6 @@ public class PanelCodigoIntermedio {
     private void seleccionarFila(int fila) {
         tabla.setRowSelectionInterval(fila, fila);
         tabla.scrollRectToVisible(tabla.getCellRect(fila, 0, true));
-    }
-
-    /** Doble clic sobre una etiqueta (L3) en el codigo de tres direcciones lleva a la linea "L3:". */
-    private void instalarSaltoAEtiqueta(JTextArea area) {
-        area.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() != 2) return;
-                String etiqueta = etiquetaEn(area, e.getPoint());
-                if (etiqueta == null) return;
-                Matcher destino = Pattern.compile("(?m)^[ \\t]*" + etiqueta + ":").matcher(area.getText());
-                if (!destino.find()) { alEstado.accept(" No se encontró " + etiqueta + ":"); return; }
-                int desde = destino.end() - etiqueta.length() - 1;
-                SwingUtilities.invokeLater(() -> { // despues de la seleccion de palabra del propio doble clic
-                    area.setCaretPosition(desde);
-                    area.moveCaretPosition(destino.end());
-                    try {
-                        java.awt.geom.Rectangle2D r = area.modelToView2D(desde);
-                        if (r != null) area.scrollRectToVisible(r.getBounds());
-                    } catch (BadLocationException ignorada) { }
-                });
-                alEstado.accept(" Etiqueta " + etiqueta);
-            }
-        });
-    }
-
-    /** La etiqueta (L1, L2...) bajo el punto `p`, o null. */
-    private static String etiquetaEn(JTextArea area, Point p) {
-        try {
-            int offset = area.viewToModel2D(p);
-            int n = area.getLineOfOffset(offset);
-            int inicioLinea = area.getLineStartOffset(n);
-            String linea = area.getText(inicioLinea, area.getLineEndOffset(n) - inicioLinea);
-            Matcher m = PATRON_ETIQUETA.matcher(linea);
-            int columna = offset - inicioLinea;
-            while (m.find()) {
-                if (columna >= m.start() && columna <= m.end()) return m.group();
-            }
-            return null;
-        } catch (BadLocationException e) {
-            return null;
-        }
     }
 
     /** Resalta las filas FUN y ETIQ y colorea los saltos (SALTO, SALTO_VER, SALTO_FAL). */
