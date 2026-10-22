@@ -1,56 +1,59 @@
 package ide.compilacion;
 
-import javax.swing.SwingWorker;
+import ide.consola.ConsolaSalida;
+
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 import java.util.function.Consumer;
 
 /**
- * Corre el compilador JER (`java -cp build JERCompiler <archivo>`) en un proceso aparte y en segundo
- * plano, para que la ventana no se congele. Los callbacks se llaman en el hilo de Swing.
+ * Corre el compilador JER (`java -cp build JERCompiler <archivo>`) en la consola del sistema que
+ * esta en la pestana Salida: el comando y su salida se ven ahi como en una terminal, y al terminar
+ * se entrega el resultado. Los callbacks se llaman en el hilo de Swing.
  */
 public class EjecutorCompilador {
-    private static final int TIMEOUT_SEG = 30;
-
     private final File carpetaBuild;
+    private final File raiz;
+    private final ConsolaSalida consola;
 
-    /** `carpetaBuild` es la carpeta con las clases del compilador (build/ en la raiz del proyecto). */
-    public EjecutorCompilador(File carpetaBuild) {
+    /**
+     * `carpetaBuild` es la carpeta con las clases del compilador (build/), `raiz` la carpeta donde
+     * esta parada la consola (la raiz del proyecto).
+     */
+    public EjecutorCompilador(File carpetaBuild, File raiz, ConsolaSalida consola) {
         this.carpetaBuild = carpetaBuild;
+        this.raiz = raiz;
+        this.consola = consola;
+    }
+
+    /** `java -cp build JERCompiler pruebas\x.txt`, con rutas relativas a la raiz cuando se puede. */
+    private String comando(File archivo) {
+        return "java -cp " + ruta(carpetaBuild) + " JERCompiler " + ruta(archivo);
+    }
+
+    private String ruta(File f) {
+        String r;
+        try {
+            r = raiz.getCanonicalFile().toPath().relativize(f.getCanonicalFile().toPath()).toString();
+        } catch (IOException | IllegalArgumentException e) {
+            r = f.getAbsolutePath();
+        }
+        return r.contains(" ") ? "\"" + r + "\"" : r;
     }
 
     /**
-     * Compila `archivo`. `alTerminar` recibe el resultado (si se paso del tiempo, la salida es el aviso
-     * de cancelacion); `alFallar`, la excepcion si no se pudo ni lanzar el proceso.
+     * Compila `archivo`. `alTerminar` recibe el resultado (si se paso del tiempo, el codigo es -1 y
+     * la salida trae el aviso); `alFallar`, la excepcion si no se pudo usar la consola.
      */
     public void compilar(File archivo, Consumer<ResultadoCompilacion> alTerminar, Consumer<Exception> alFallar) {
         long inicio = System.currentTimeMillis(); // para no mostrar archivos de salida de una compilacion anterior
-        new SwingWorker<String, Void>() {
-            @Override protected String doInBackground() throws Exception {
-                String javaBin = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-                File tmp = File.createTempFile("jer", ".out");
-                try {
-                    Process p = new ProcessBuilder(javaBin, "-cp", carpetaBuild.getAbsolutePath(), "JERCompiler", archivo.getAbsolutePath())
-                            .redirectErrorStream(true).redirectOutput(tmp).start();
-                    if (!p.waitFor(TIMEOUT_SEG, TimeUnit.SECONDS)) {
-                        p.destroyForcibly();
-                        return "El compilador no respondio en " + TIMEOUT_SEG + " s; se cancelo.";
-                    }
-                    return new String(Files.readAllBytes(tmp.toPath()), StandardCharsets.UTF_8);
-                } finally {
-                    tmp.delete();
-                }
-            }
-
-            @Override protected void done() {
-                try {
-                    alTerminar.accept(ResultadoCompilacion.analizar(get(), inicio));
-                } catch (Exception e) {
-                    alFallar.accept(e);
-                }
-            }
-        }.execute();
+        try {
+            consola.ejecutar(comando(archivo), (salida, codigo, duracion, cancelado) -> {
+                String texto = cancelado ? salida + "El compilador no respondió a tiempo; se canceló.\n" : salida;
+                alTerminar.accept(ResultadoCompilacion.analizar(texto, inicio, cancelado ? -1 : codigo, duracion));
+            });
+        } catch (IOException | IllegalStateException e) {
+            alFallar.accept(e);
+        }
     }
 }

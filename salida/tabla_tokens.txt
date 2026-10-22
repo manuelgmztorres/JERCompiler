@@ -1,5 +1,5 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_ide.txt
+Archivo: pruebas\prueba_ide.txt
 No.   | Lexema               | Token                        | Línea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | ENT                  | ENT                          | 1      | 1

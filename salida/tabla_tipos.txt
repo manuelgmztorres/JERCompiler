@@ -1,5 +1,5 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_ide.txt
+Archivo: pruebas\prueba_ide.txt
 Nombre               | Categoría  | Tipo   | Dimensiones | Ámbito           | Línea  | Usado | Parámetros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
 n1                   | variable   | ENT    | 0           | GLOBAL           | 1      | sí    | 

@@ -15,8 +15,12 @@ public final class Tema {
     public final Color fondoPanel, textoPanel;
     // Arbol de proyecto.
     public final Color fondoArbol, textoArbol;
-    // Consolas de texto (Salida, Errores, Tres direcciones, Tabla de simbolos).
+    // Consolas de texto (Salida, Errores).
     public final Color fondoConsola, textoConsola;
+    // Consola de Salida: prompt, errores, sugerencias "->", "Errores: 0" y mensajes del IDE.
+    public final Color consolaPrompt, consolaError, consolaSugerencia, consolaExito, consolaInfo;
+    // Documento de tres direcciones (panel derecho del editor).
+    public final Color fondoDocumento, textoDocumento, fondoEncabezadoDoc, textoEncabezadoDoc, subtituloDoc;
     // Editor y gutter de numeros de linea.
     public final Color fondoEditor, cursorEditor, fondoNumeros, textoNumeros;
     // Resaltado de sintaxis JER.
@@ -39,6 +43,16 @@ public final class Tema {
             textoArbol = Color.WHITE;
             fondoConsola = new Color(0x1E1E1E);
             textoConsola = Color.GREEN;
+            consolaPrompt = new Color(0x6CB4FF);
+            consolaError = new Color(0xFF6B6B);
+            consolaSugerencia = new Color(0xFFD866);
+            consolaExito = new Color(0x7CFC7C);
+            consolaInfo = new Color(0x9E9E9E);
+            fondoDocumento = new Color(0x252526);
+            textoDocumento = new Color(0xE0E0E0);
+            fondoEncabezadoDoc = new Color(0x333333);
+            textoEncabezadoDoc = Color.WHITE;
+            subtituloDoc = new Color(0xA0A0A0);
             fondoEditor = new Color(0x2B2B2B);
             cursorEditor = Color.WHITE;
             fondoNumeros = new Color(0x333333);
@@ -67,6 +81,16 @@ public final class Tema {
             textoArbol = Color.BLACK;
             fondoConsola = Color.BLACK;
             textoConsola = Color.GREEN;
+            consolaPrompt = new Color(0x6CB4FF);
+            consolaError = new Color(0xFF6B6B);
+            consolaSugerencia = new Color(0xFFD866);
+            consolaExito = new Color(0x7CFC7C);
+            consolaInfo = new Color(0xA0A0A0);
+            fondoDocumento = new Color(0xFCFCFA);
+            textoDocumento = new Color(0x202020);
+            fondoEncabezadoDoc = new Color(0xE8EDF3);
+            textoEncabezadoDoc = new Color(0x1F2D3D);
+            subtituloDoc = new Color(0x6B7785);
             fondoEditor = Color.WHITE;
             cursorEditor = Color.BLACK;
             fondoNumeros = new Color(0xF0F0F0);

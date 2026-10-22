@@ -1,5 +1,5 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_ide.txt
+Archivo: pruebas\prueba_ide.txt
 
 FUN _global
         n1 = 0

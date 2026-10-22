@@ -23,16 +23,23 @@ public final class ResultadoCompilacion {
     public final boolean sinErrores;
     /** Momento (System.currentTimeMillis) en que empezo la compilacion. */
     public final long inicio;
+    /** Codigo de salida del proceso del compilador (-1 si se cancelo por timeout). */
+    public final int codigoSalida;
+    /** Duracion de la compilacion en milisegundos. */
+    public final long duracionMs;
 
-    private ResultadoCompilacion(String salida, String errores, Set<Integer> lineas, boolean sinErrores, long inicio) {
+    private ResultadoCompilacion(String salida, String errores, Set<Integer> lineas, boolean sinErrores, long inicio,
+            int codigoSalida, long duracionMs) {
         this.salida = salida;
         this.errores = errores;
         this.lineasConError = Collections.unmodifiableSet(lineas);
         this.sinErrores = sinErrores;
         this.inicio = inicio;
+        this.codigoSalida = codigoSalida;
+        this.duracionMs = duracionMs;
     }
 
-    public static ResultadoCompilacion analizar(String salida, long inicio) {
+    public static ResultadoCompilacion analizar(String salida, long inicio, int codigoSalida, long duracionMs) {
         StringBuilder errores = new StringBuilder();
         Set<Integer> lineas = new TreeSet<>();
         boolean enError = false;
@@ -46,6 +53,7 @@ public final class ResultadoCompilacion {
             }
             if (enError) errores.append(linea).append('\n');
         }
-        return new ResultadoCompilacion(salida, errores.toString(), lineas, PATRON_SIN_ERRORES.matcher(salida).find(), inicio);
+        return new ResultadoCompilacion(salida, errores.toString(), lineas, PATRON_SIN_ERRORES.matcher(salida).find(), inicio,
+                codigoSalida, duracionMs);
     }
 }

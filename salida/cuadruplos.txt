@@ -1,5 +1,5 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: C:\Users\h_hor\Documents\ITVER\7moSemestre\LenguajesAutomatas2\JERCompiler\.\pruebas\prueba_ide.txt
+Archivo: pruebas\prueba_ide.txt
 Operador | Arg1         | Arg2 | Resultado
 ---------+--------------+------+----------
 FUN      | _global      |      |

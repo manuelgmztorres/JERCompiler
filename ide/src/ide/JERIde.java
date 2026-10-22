@@ -23,9 +23,10 @@ import java.util.prefs.Preferences;
 
 /**
  * Ventana principal del IDE: toolbar, atajos, pestanas de editor, sesion, tema, abrir/guardar y la
- * orquestacion de la compilacion. El resto vive en sus paquetes: editor/ (pestana, resaltado,
- * buscar), proyecto/ (arbol), compilacion/ (proceso del compilador) y consola/ (salida, errores y
- * codigo intermedio).
+ * orquestacion de la compilacion. El editor se parte en dos: pestanas a la izquierda y el documento
+ * de tres direcciones a la derecha. El resto vive en sus paquetes: editor/ (pestana, resaltado,
+ * buscar), proyecto/ (arbol), compilacion/ (proceso del compilador) y consola/ (consola de salida,
+ * errores y codigo intermedio).
  */
 public class JERIde extends JFrame {
     /**
@@ -46,12 +47,17 @@ public class JERIde extends JFrame {
     private final JLabel etiquetaPosicion = new JLabel("");
     private final JButton btnCompilar = new JButton("Compilar");
     private final JToggleButton btnModoOscuro = new JToggleButton("Modo oscuro");
+    private final JToggleButton btnTresDir = new JToggleButton("Tres direcciones", true);
     private final JFileChooser chooser = new JFileChooser();
     private final FileNameExtensionFilter filtroAbrir = new FileNameExtensionFilter("Archivos JER (*.jer, *.txt)", "jer", "txt");
 
     private final ArbolProyecto arbol = new ArbolProyecto(raizProyecto, this::nuevaPestana);
-    private final PanelConsola consola = new PanelConsola(new File(raizProyecto, "salida"), this::irA, this::estado);
-    private final EjecutorCompilador compilador = new EjecutorCompilador(new File(raizProyecto, "build"));
+    private final PanelConsola consola = new PanelConsola(new File(raizProyecto, "salida"), this::irA, this::estado,
+            () -> mostrarTresDir(false));
+    /** Editor a la izquierda y documento de tres direcciones a la derecha. */
+    private final JSplitPane splitEditor = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+    private double proporcionTresDir = 0.62;
+    private final EjecutorCompilador compilador = new EjecutorCompilador(new File(raizProyecto, "build"), raizProyecto, consola.salida());
     private DialogoBuscar dialogoBuscar; // se crea la primera vez que se abre
     private Tema tema = Tema.CLARO;
 
@@ -79,9 +85,11 @@ public class JERIde extends JFrame {
         btnCompilar.setToolTipText("Compilar (F5)");
         btnLimpiar.addActionListener(e -> limpiarConsola());
         btnModoOscuro.addActionListener(e -> conRedDeSeguridad(() -> aplicarTema(Tema.de(btnModoOscuro.isSelected()))));
+        btnTresDir.setToolTipText("Mostrar u ocultar el código de tres direcciones junto al editor (Ctrl+T)");
+        btnTresDir.addActionListener(e -> mostrarTresDir(btnTresDir.isSelected()));
 
         for (JComponent c : new JComponent[] {btnNuevo, btnAbrir, btnGuardar, btnGuardarComo, btnBuscar,
-                btnCompilar, btnLimpiar, btnModoOscuro}) {
+                btnCompilar, btnLimpiar, btnTresDir, btnModoOscuro}) {
             toolbar.add(c);
         }
 
@@ -89,7 +97,13 @@ public class JERIde extends JFrame {
         barraEstado.add(etiquetaEstado, BorderLayout.WEST);
         barraEstado.add(etiquetaPosicion, BorderLayout.EAST);
 
-        JSplitPane splitVertical = new JSplitPane(JSplitPane.VERTICAL_SPLIT, pestanas, consola);
+        splitEditor.setLeftComponent(pestanas);
+        splitEditor.setRightComponent(consola.codigoIntermedio().documento());
+        splitEditor.setResizeWeight(0.6);
+        splitEditor.setContinuousLayout(true);
+        splitEditor.setBorder(null);
+
+        JSplitPane splitVertical = new JSplitPane(JSplitPane.VERTICAL_SPLIT, splitEditor, consola);
         splitVertical.setResizeWeight(0.7);
 
         JSplitPane splitHorizontal = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(arbol), splitVertical);
@@ -106,6 +120,8 @@ public class JERIde extends JFrame {
         atajo(KeyEvent.VK_F, ctrl, "buscarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_H, ctrl, "reemplazarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_F5, 0, "compilarAtajo", () -> { if (btnCompilar.isEnabled()) compilar(); });
+        atajo(KeyEvent.VK_T, ctrl, "tresDirAtajo", () -> mostrarTresDir(!btnTresDir.isSelected()));
+
 
         pestanas.addChangeListener(e -> actualizarPosicion());
 
@@ -153,6 +169,8 @@ public class JERIde extends JFrame {
     // ---------- sesion (tema + archivos abiertos) ----------
 
     private void restaurarSesion() {
+        if (!prefs.getBoolean("tresDir", true)) mostrarTresDir(false);
+        else SwingUtilities.invokeLater(() -> splitEditor.setDividerLocation(proporcionTresDir));
         if (prefs.getBoolean("oscuro", false)) {
             btnModoOscuro.setSelected(true);
             aplicarTema(Tema.OSCURO);
@@ -171,6 +189,7 @@ public class JERIde extends JFrame {
             if (f != null) abiertos.append(abiertos.length() > 0 ? "|" : "").append(f.getAbsolutePath());
         }
         prefs.putBoolean("oscuro", tema.oscuro);
+        prefs.putBoolean("tresDir", btnTresDir.isSelected());
         prefs.put("abiertos", abiertos.toString());
     }
 
@@ -183,6 +202,7 @@ public class JERIde extends JFrame {
                 "Hay archivos con cambios sin guardar. ¿Salir de todos modos?",
                 "Cambios sin guardar", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
         guardarSesion();
+        consola.salida().cerrar();
         dispose();
         System.exit(0);
     }
@@ -337,6 +357,26 @@ public class JERIde extends JFrame {
         return f;
     }
 
+    // ---------- documento de tres direcciones ----------
+
+    /** Muestra u oculta el documento de tres direcciones a la derecha del editor, conservando su ancho. */
+    private void mostrarTresDir(boolean mostrar) {
+        btnTresDir.setSelected(mostrar);
+        JComponent documento = consola.codigoIntermedio().documento();
+        if (documento.isVisible() == mostrar) return;
+        if (!mostrar && splitEditor.getWidth() > 0) {
+            proporcionTresDir = (double) splitEditor.getDividerLocation() / splitEditor.getWidth();
+        }
+        documento.setVisible(mostrar);
+        if (mostrar) {
+            splitEditor.setDividerSize(UIManager.getInt("SplitPane.dividerSize"));
+            splitEditor.setDividerLocation(proporcionTresDir);
+        } else {
+            splitEditor.setDividerSize(0);
+        }
+        splitEditor.revalidate();
+    }
+
     // ---------- buscar ----------
 
     private void mostrarBuscar() {
@@ -360,6 +400,7 @@ public class JERIde extends JFrame {
 
         btnCompilar.setEnabled(false);
         estado(" Compilando...");
+        consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
         compilador.compilar(tab.getArchivo(),
                 resultado -> { btnCompilar.setEnabled(true); mostrarResultado(tab, resultado); },
                 error -> {
@@ -381,7 +422,7 @@ public class JERIde extends JFrame {
         tab.marcarLineas(r.lineasConError);
 
         consola.tablas().cargar(r.sinErrores, r.inicio);
-        boolean hayCodigo = consola.codigoIntermedio().cargar(r.sinErrores, r.inicio);
+        boolean hayCodigo = consola.codigoIntermedio().cargar(r.sinErrores, r.inicio, tab.getArchivo().getName());
         boolean hayErrores = !r.lineasConError.isEmpty();
         if (hayErrores) consola.setSelectedIndex(PanelConsola.TAB_ERRORES);
         else if (consola.getSelectedIndex() == PanelConsola.TAB_ERRORES) consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
