@@ -141,7 +141,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
         writer.println("TABLA DE CUÁDRUPLOS - JERCompiler");
         writer.println("Archivo: " + nombre);
         writer.println();
-        writer.print("Codigo fuente con errores, no se puede generar el código intermedio.");
+        writer.print("Código fuente con errores, no se puede generar el código intermedio.");
       } catch (IOException e) { 
         System.out.println("[ADVERTENCIA] No se pudo reescribir cuadruplos.txt: " + e.getMessage()); 
       }
@@ -151,7 +151,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
         writer.println("CÓDIGO DE TRES DIRECCIONES - JERCompiler");
         writer.println("Archivo: " + nombre);
         writer.println();
-        writer.print("Codigo fuente con errores, no se puede generar el código de tres direcciones.");
+        writer.print("Código fuente con errores, no se puede generar el código de tres direcciones.");
       } catch (IOException e) { 
         System.out.println("[ADVERTENCIA] No se pudo reescribir cod_tres_dir.txt: " + e.getMessage()); 
       }

@@ -1,38 +1,10 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: pruebas\prueba_valida.txt
+Archivo: pruebas\prueba_ide.txt
 Nombre               | Categoría  | Tipo   | Dimensiones | Ámbito           | Línea  | Usado | Parámetros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
-PI                   | constante  | DEC    | 0           | GLOBAL           | 7      | no    | 
-SALUDO               | constante  | CAD    | 0           | GLOBAL           | 8      | sí    | 
-MODO_DEBUG           | constante  | BOO    | 0           | GLOBAL           | 9      | no    | 
-contador             | variable   | ENT    | 0           | GLOBAL           | 11     | sí    | 
-factor               | variable   | DEC    | 0           | GLOBAL           | 12     | sí    | 
-mensaje              | variable   | CAD    | 0           | GLOBAL           | 13     | no    | 
-letra                | variable   | CAR    | 0           | GLOBAL           | 14     | no    | 
-activo               | variable   | BOO    | 0           | GLOBAL           | 15     | sí    | 
-vector               | variable   | ENT    | 1           | GLOBAL           | 17     | sí    | 
-matriz               | variable   | DEC    | 2           | GLOBAL           | 18     | sí    | 
-factorial            | función    | ENT    | 0           | GLOBAL           | 21     | sí    | [ENT]
-calcular             | función    | DEC    | 0           | GLOBAL           | 30     | sí    | [DEC, DEC]
-evaluarNota          | función    | VACIO  | 0           | GLOBAL           | 38     | sí    | [ENT]
-controlDeFlujo       | función    | VACIO  | 0           | GLOBAL           | 53     | sí    | [ENT]
-entradaSalida        | función    | VACIO  | 0           | GLOBAL           | 76     | sí    | []
-contarHastaCero      | función    | VACIO  | 0           | GLOBAL           | 86     | sí    | [ENT]
-clasificar           | función    | VACIO  | 0           | GLOBAL           | 95     | sí    | [ENT]
-principal            | función    | VACIO  | 0           | GLOBAL           | 107    | no    | []
-n                    | parámetro  | ENT    | 0           | factorial        | 21     | sí    | 
-base                 | parámetro  | DEC    | 0           | calcular         | 30     | sí    | 
-exponente            | parámetro  | DEC    | 0           | calcular         | 30     | sí    | 
-potencia             | variable   | DEC    | 0           | calcular         | 31     | sí    | 
-raiz                 | variable   | DEC    | 0           | calcular         | 32     | sí    | 
-residuo              | variable   | DEC    | 0           | calcular         | 33     | sí    | 
-nota                 | parámetro  | ENT    | 0           | evaluarNota      | 38     | sí    | 
-limite               | parámetro  | ENT    | 0           | controlDeFlujo   | 53     | sí    | 
-i                    | variable   | ENT    | 0           | controlDeFlujo   | 54     | sí    | 
-j                    | variable   | ENT    | 0           | controlDeFlujo   | 62     | sí    | 
-lectura              | variable   | ENT    | 0           | entradaSalida    | 77     | sí    | 
-inicio               | parámetro  | ENT    | 0           | contarHastaCero  | 86     | sí    | 
-i                    | variable   | ENT    | 0           | contarHastaCero  | 87     | sí    | 
-nota                 | parámetro  | ENT    | 0           | clasificar       | 95     | sí    | 
-resultado            | variable   | DEC    | 0           | principal        | 111    | sí    | 
+n1                   | variable   | ENT    | 0           | GLOBAL           | 1      | sí    | 
+n2                   | variable   | ENT    | 0           | GLOBAL           | 2      | sí    | 
+n3                   | constante  | ENT    | 0           | GLOBAL           | 3      | sí    | 
+principal            | función    | VACIO  | 0           | GLOBAL           | 5      | no    | []
+resta                | variable   | ENT    | 0           | principal        | 7      | sí    | 
 --------------------------------------------

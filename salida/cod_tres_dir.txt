@@ -1,4 +1,21 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: pruebas\prueba_revision1.txt
+Archivo: pruebas\prueba_ide.txt
 
-Codigo fuente con errores, no se puede generar el código de tres direcciones.
+FUN _inicio
+        LLAMAR _global, 0
+        LLAMAR principal, 0
+        RET
+
+FUN _global
+        n1 = 0
+        n2 = 1
+        n3 = 8
+        RET
+
+FUN principal
+        IMP "Hola Mundo"
+        t1 = n1 - n2
+        resta = t1 - n3
+        IMP resta
+        RET
+--------------------------------------------
