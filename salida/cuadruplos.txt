@@ -1,20 +1,4 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: pruebas\prueba_ide.txt
-Operador | Arg1         | Arg2 | Resultado
----------+--------------+------+----------
-FUN      | _inicio      |      |
-LLAMAR   | _global      | 0    |
-LLAMAR   | principal    | 0    |
-RET      |              |      |
-FUN      | _global      |      |
-ASIG     | 0            |      | n1
-ASIG     | 1            |      | n2
-ASIG     | 8            |      | n3
-RET      |              |      |
-FUN      | principal    |      |
-IMP      | "Hola Mundo" |      |
--        | n1           | n2   | t1
--        | t1           | n3   | resta
-IMP      | resta        |      |
-RET      |              |      |
---------------------------------------------
+Archivo: pruebas\prueba_valida.txt
+
+Código fuente con errores, no se puede generar el código intermedio.
