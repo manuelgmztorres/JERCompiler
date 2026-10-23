@@ -38,5 +38,4 @@ No.   | Lexema               | Token                        | Línea  | Columna
 34    | ;                    | ;                            | 7      | 30
 35    | IMP                  | IMP                          | 8      | 5
 36    | resta                | <IDENTIFICADOR>              | 8      | 9
-37    | ;                    | ;                            | 8      | 14
-38    | }                    | }                            | 9      | 1
+37    | }                    | }                            | 9      | 1
