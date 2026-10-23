@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,6 +40,9 @@ public class ConsolaSalida extends JPanel {
     private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase().contains("win");
     private static final String FIN_LINEA = WINDOWS ? "\r\n" : "\n";
     private static final int TIMEOUT_SEG = 30;
+
+    /** Lo devuelve el detector de comandos para que el comando escrito no se mande al shell. */
+    public static final AlTerminar NO_EJECUTAR = (salida, codigo, duracion, cancelado) -> { };
 
     /** Resultado de un comando lanzado con ejecutar(). */
     public interface AlTerminar {
@@ -68,6 +72,11 @@ public class ConsolaSalida extends JPanel {
     private boolean interno = false;
 
     private Captura captura;
+    /**
+     * Revisa cada comando que el usuario escribe a mano: si devuelve un AlTerminar, el comando se
+     * captura igual que los del IDE (para refrescar errores, tablas y cuadruplos al terminar).
+     */
+    private Function<String, AlTerminar> detectorComandos;
     private final List<String> historial = new ArrayList<>();
     private int posHistorial = 0;
 
@@ -165,18 +174,31 @@ public class ConsolaSalida extends JPanel {
      * abrir el shell, e IllegalStateException si ya hay un comando del IDE en curso.
      */
     public void ejecutar(String comando, AlTerminar alTerminar) throws IOException {
+        ejecutar(comando, TIMEOUT_SEG, alTerminar);
+    }
+
+    /** Como ejecutar(comando, alTerminar), pero con un tiempo limite de `timeoutSeg` segundos. */
+    public void ejecutar(String comando, int timeoutSeg, AlTerminar alTerminar) throws IOException {
         if (captura != null) throw new IllegalStateException("ya hay una compilación en curso");
+        if (!WINDOWS) escribirEntrada(comando); // sh sin terminal no repite el comando
+        capturar(comando, timeoutSeg, alTerminar);
+    }
+
+    /** Ver detectorComandos. */
+    public void setDetectorComandos(Function<String, AlTerminar> detector) { this.detectorComandos = detector; }
+
+    /** Manda `comando` al shell seguido de la marca y junta su salida hasta verla. */
+    private void capturar(String comando, int timeoutSeg, AlTerminar alTerminar) throws IOException {
         Captura c = new Captura(alTerminar);
         captura = c;
         try {
-            if (!WINDOWS) escribirEntrada(comando); // sh sin terminal no repite el comando
             enviar(comando);
             enviar("echo " + MARCA + " " + (WINDOWS ? "%errorlevel%" : "$?"));
         } catch (IOException e) {
             captura = null;
             throw e;
         }
-        c.timeout = new Timer(TIMEOUT_SEG * 1000, e -> { c.cancelado = true; detenerPrograma(); });
+        c.timeout = new Timer(timeoutSeg * 1000, e -> { c.cancelado = true; detenerPrograma(); });
         c.timeout.setRepeats(false);
         c.timeout.start();
     }
@@ -310,6 +332,20 @@ public class ConsolaSalida extends JPanel {
     /** Un error del IDE en rojo. */
     public void error(String texto) { escribirLinea(texto, estError); }
 
+    /**
+     * Equivale a escribir "cls": el shell limpia la pantalla y vuelve a mostrar su prompt. Si hay un
+     * comando en curso (o no es Windows), solo se vacia la consola.
+     */
+    public void cls() {
+        if (WINDOWS && shellVivo() && captura == null) {
+            try {
+                enviar("cls");
+                return;
+            } catch (IOException ignorada) { }
+        }
+        limpiar();
+    }
+
     /** Vacia la consola, conservando lo que el usuario estaba escribiendo. */
     public void limpiar() {
         String entrada = textoEntrada();
@@ -366,9 +402,15 @@ public class ConsolaSalida extends JPanel {
             historial.add(comando);
         }
         posHistorial = historial.size();
+        AlTerminar alTerminar = captura == null && detectorComandos != null ? detectorComandos.apply(comando) : null;
+        if (alTerminar == NO_EJECUTAR) { // se cancelo: el comando vuelve a la linea del prompt
+            reemplazarEntrada(comando);
+            return;
+        }
         if (!WINDOWS) escribirEntrada(comando);
         try {
-            enviar(comando);
+            if (alTerminar != null) capturar(comando, TIMEOUT_SEG, alTerminar);
+            else enviar(comando);
         } catch (IOException e) {
             escribirLinea("No se pudo enviar el comando a la consola: " + e.getMessage(), estError);
         }
@@ -387,7 +429,7 @@ public class ConsolaSalida extends JPanel {
         accion(im, am, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "consolaEnter", this::enter);
         accion(im, am, KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "consolaArriba", () -> navegarHistorial(-1));
         accion(im, am, KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "consolaAbajo", () -> navegarHistorial(1));
-        accion(im, am, KeyStroke.getKeyStroke(KeyEvent.VK_L, ctrl), "consolaLimpiar", this::limpiar);
+        accion(im, am, KeyStroke.getKeyStroke(KeyEvent.VK_L, ctrl), "consolaLimpiar", this::cls);
         accion(im, am, KeyStroke.getKeyStroke(KeyEvent.VK_C, ctrl), "consolaCtrlC", () -> {
             if (area.getSelectionStart() != area.getSelectionEnd()) area.copy();
             else detenerPrograma();

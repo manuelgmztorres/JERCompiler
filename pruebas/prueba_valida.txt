@@ -111,7 +111,7 @@ FUN VACIO principal() {
     DEC resultado -> calcular(4.0, 3.0);
     IMP resultado;
     IMP factorial(6);
-    entradaSalida();
+    entradaSalida()
     contarHastaCero(3);
     clasificar(80);
 }

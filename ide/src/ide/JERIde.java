@@ -41,15 +41,16 @@ public class JERIde extends JFrame {
 
     private final JTabbedPane pestanas = new JTabbedPane();
     private final Map<EditorTab, JLabel> etiquetasPestana = new IdentityHashMap<>();
-    private final JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    private final JPanel toolbar = new JPanel(new BorderLayout());
     private final JPanel barraEstado = new JPanel(new BorderLayout());
     private final JLabel etiquetaEstado = new JLabel(" Listo");
     private final JLabel etiquetaPosicion = new JLabel("");
     private final JButton btnCompilar = new JButton("Compilar");
+    private final JButton btnCompilarCompilador = new JButton("Compilar compilador");
     private final JToggleButton btnModoOscuro = new JToggleButton("Modo oscuro");
     private final JToggleButton btnTresDir = new JToggleButton("Tres direcciones", true);
     private final JFileChooser chooser = new JFileChooser();
-    private final FileNameExtensionFilter filtroAbrir = new FileNameExtensionFilter("Archivos JER (*.jer, *.txt)", "jer", "txt");
+    private final FileNameExtensionFilter filtroAbrir = new FileNameExtensionFilter("Archivos JER (*.txt)", "txt");
 
     private final ArbolProyecto arbol = new ArbolProyecto(raizProyecto, this::nuevaPestana);
     private final PanelConsola consola = new PanelConsola(new File(raizProyecto, "salida"), this::irA, this::estado,
@@ -83,15 +84,29 @@ public class JERIde extends JFrame {
         btnBuscar.addActionListener(e -> conRedDeSeguridad(this::mostrarBuscar));
         btnCompilar.addActionListener(e -> conRedDeSeguridad(this::compilar));
         btnCompilar.setToolTipText("Compilar (F5)");
+        btnCompilarCompilador.addActionListener(e -> conRedDeSeguridad(this::compilarCompilador));
+        btnCompilarCompilador.setToolTipText("Regenerar el compilador JER con compilar.bat: jjtree, javacc y javac");
+        // Compilaciones escritas a mano en la consola: refrescan errores, tablas y cuadruplos igual que el boton.
+        compilador.escucharComandosManuales(
+                this::antesDeCompilarManual,
+                (archivo, r) -> conRedDeSeguridad(() -> mostrarResultado(pestanaDe(archivo), archivo, r)));
         btnLimpiar.addActionListener(e -> limpiarConsola());
+        btnLimpiar.setToolTipText("Borrar los resultados de la compilación y hacer cls en Salida");
         btnModoOscuro.addActionListener(e -> conRedDeSeguridad(() -> aplicarTema(Tema.de(btnModoOscuro.isSelected()))));
         btnTresDir.setToolTipText("Mostrar u ocultar el código de tres direcciones junto al editor (Ctrl+T)");
         btnTresDir.addActionListener(e -> mostrarTresDir(btnTresDir.isSelected()));
 
-        for (JComponent c : new JComponent[] {btnNuevo, btnAbrir, btnGuardar, btnGuardarComo, btnBuscar,
-                btnCompilar, btnLimpiar, btnTresDir, btnModoOscuro}) {
-            toolbar.add(c);
-        }
+        // Secciones: Archivo | Edicion | Compilacion a la izquierda; Vista a la derecha.
+        JPanel izquierda = panelToolbar(FlowLayout.LEFT);
+        agregarSeccion(izquierda, btnNuevo, btnAbrir, btnGuardar, btnGuardarComo);
+        izquierda.add(separadorToolbar());
+        agregarSeccion(izquierda, btnBuscar);
+        izquierda.add(separadorToolbar());
+        agregarSeccion(izquierda, btnCompilar, btnCompilarCompilador, btnLimpiar);
+        JPanel derecha = panelToolbar(FlowLayout.RIGHT);
+        agregarSeccion(derecha, btnTresDir, btnModoOscuro);
+        toolbar.add(izquierda, BorderLayout.CENTER);
+        toolbar.add(derecha, BorderLayout.EAST);
 
         etiquetaPosicion.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 8));
         barraEstado.add(etiquetaEstado, BorderLayout.WEST);
@@ -146,6 +161,24 @@ public class JERIde extends JFrame {
         g.drawString("J", 10, 24);
         g.dispose();
         return img;
+    }
+
+    /** Panel transparente de la barra de herramientas (toma el fondo del tema de `toolbar`). */
+    private static JPanel panelToolbar(int alineacion) {
+        JPanel p = new JPanel(new FlowLayout(alineacion, 5, 5));
+        p.setOpaque(false);
+        return p;
+    }
+
+    private static void agregarSeccion(JPanel panel, JComponent... botones) {
+        for (JComponent b : botones) panel.add(b);
+    }
+
+    /** Linea vertical entre secciones de la barra de herramientas. */
+    private static JComponent separadorToolbar() {
+        JSeparator s = new JSeparator(SwingConstants.VERTICAL);
+        s.setPreferredSize(new Dimension(8, 24));
+        return s;
     }
 
     private void atajo(int tecla, int mascara, String nombre, Runnable accion) {
@@ -211,6 +244,8 @@ public class JERIde extends JFrame {
 
     private void aplicarTema(Tema nuevo) {
         tema = nuevo;
+        // Primero los componentes estandar de Swing (reinstala sus UI); despues los colores propios.
+        TemaSwing.aplicar(tema.oscuro, chooser, consola.codigoIntermedio().documento());
         JERSyntaxHighlighter.aplicarTema(tema);
         for (JComponent c : new JComponent[] {toolbar, barraEstado, pestanas}) {
             c.setBackground(tema.fondoPanel);
@@ -230,12 +265,10 @@ public class JERIde extends JFrame {
 
     private void nuevaPestana(File archivo) {
         if (archivo != null) {
-            for (int i = 0; i < pestanas.getTabCount(); i++) {
-                File abierto = ((EditorTab) pestanas.getComponentAt(i)).getArchivo();
-                if (archivo.getAbsoluteFile().equals(abierto)) {
-                    pestanas.setSelectedIndex(i);
-                    return;
-                }
+            EditorTab abierta = pestanaDe(archivo);
+            if (abierta != null) {
+                pestanas.setSelectedComponent(abierta);
+                return;
             }
         }
         EditorTab tab;
@@ -341,7 +374,7 @@ public class JERIde extends JFrame {
         }
     }
 
-    /** Pide un nombre de archivo (por defecto en pruebas/) y le agrega .txt si no trae .txt ni .jer. */
+    /** Pide un nombre de archivo (por defecto en pruebas/) y le agrega .txt si no lo trae (unico formato). */
     private File elegirDestino(File actual) {
         chooser.setFileFilter(filtroAbrir);
         chooser.setCurrentDirectory(actual != null ? actual.getParentFile() : carpetaPruebas);
@@ -350,7 +383,7 @@ public class JERIde extends JFrame {
 
         File f = chooser.getSelectedFile();
         String nombre = f.getName().toLowerCase();
-        if (!nombre.endsWith(".txt") && !nombre.endsWith(".jer")) f = new File(f.getParentFile(), f.getName() + ".txt");
+        if (!nombre.endsWith(".txt")) f = new File(f.getParentFile(), f.getName() + ".txt");
         if (f.exists() && !f.equals(actual) && JOptionPane.showConfirmDialog(this,
                 "\"" + f.getName() + "\" ya existe. ¿Reemplazarlo?", "Guardar como",
                 JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return null;
@@ -386,6 +419,7 @@ public class JERIde extends JFrame {
 
     // ---------- consola / compilar ----------
 
+    /** Borra los resultados (errores, tablas, cuadruplos, tres direcciones y marcas) y hace "cls" en Salida. */
     private void limpiarConsola() {
         consola.limpiar();
         EditorTab tab = pestanaActual();
@@ -398,16 +432,39 @@ public class JERIde extends JFrame {
         if (tab == null) return;
         if ((tab.getArchivo() == null || tab.isModificado()) && !guardarTab(tab, false)) return;
 
-        btnCompilar.setEnabled(false);
+        habilitarCompilacion(false);
         estado(" Compilando...");
         consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
         compilador.compilar(tab.getArchivo(),
-                resultado -> { btnCompilar.setEnabled(true); mostrarResultado(tab, resultado); },
+                resultado -> { habilitarCompilacion(true); mostrarResultado(tab, tab.getArchivo(), resultado); },
                 error -> {
-                    btnCompilar.setEnabled(true);
+                    habilitarCompilacion(true);
                     consola.mostrarMensaje("Error al compilar: " + error.getMessage());
                     consola.codigoIntermedio().limpiar(" Sin código intermedio: la compilación falló.");
                     estado(" Error al compilar");
+                });
+    }
+
+    /** Activa o desactiva Compilar y Compilar compilador (solo puede correr uno a la vez). */
+    private void habilitarCompilacion(boolean habilitar) {
+        btnCompilar.setEnabled(habilitar);
+        btnCompilarCompilador.setEnabled(habilitar);
+    }
+
+    /** Corre compilar.bat en la consola; mientras tanto no se puede compilar ningun archivo. */
+    private void compilarCompilador() {
+        habilitarCompilacion(false);
+        estado(" Compilando el compilador...");
+        consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
+        compilador.compilarCompilador(
+                ok -> {
+                    habilitarCompilacion(true);
+                    estado(ok ? " Compilador listo" : " Falló la compilación del compilador");
+                },
+                error -> {
+                    habilitarCompilacion(true);
+                    consola.mostrarMensaje("Error al compilar el compilador: " + error.getMessage());
+                    estado(" Falló la compilación del compilador");
                 });
     }
 
@@ -417,18 +474,58 @@ public class JERIde extends JFrame {
      * Con errores se muestra la pestana Errores; sin errores se queda la pestana que estaba abierta
      * (salvo Errores, que quedaria vacia: ahi se pasa a Salida).
      */
-    private void mostrarResultado(EditorTab tab, ResultadoCompilacion r) {
+    private void mostrarResultado(EditorTab tab, File archivo, ResultadoCompilacion r) {
         consola.mostrarResultado(r);
-        tab.marcarLineas(r.lineasConError);
+        if (tab != null) tab.marcarLineas(r.lineasConError);
 
         consola.tablas().cargar(r.sinErrores, r.inicio);
-        boolean hayCodigo = consola.codigoIntermedio().cargar(r.sinErrores, r.inicio, tab.getArchivo().getName());
+        boolean hayCodigo = consola.codigoIntermedio().cargar(r.sinErrores, r.inicio, archivo.getName());
         boolean hayErrores = !r.lineasConError.isEmpty();
         if (hayErrores) consola.setSelectedIndex(PanelConsola.TAB_ERRORES);
         else if (consola.getSelectedIndex() == PanelConsola.TAB_ERRORES) consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
         if (hayErrores) estado(" " + r.lineasConError.size() + " linea(s) con error");
         else if (hayCodigo) estado(" Compilacion terminada: " + consola.codigoIntermedio().cantidadCuadruplos() + " cuadruplo(s)");
         else estado(" Compilacion terminada");
+    }
+
+    /**
+     * Al dar Enter en una compilacion escrita a mano: abre el archivo en el editor y, si su pestana
+     * tiene cambios sin guardar, avisa (el compilador lee el archivo del disco). Devuelve false si
+     * se cancela.
+     */
+    private boolean antesDeCompilarManual(File archivo) {
+        try {
+            EditorTab tab = pestanaDe(archivo);
+            if (tab == null) {
+                if (archivo.isFile()) nuevaPestana(archivo);
+                return true;
+            }
+            pestanas.setSelectedComponent(tab);
+            if (!tab.isModificado()) return true;
+            String[] opciones = { "Guardar y compilar", "Compilar sin guardar", "Cancelar" };
+            int op = JOptionPane.showOptionDialog(this,
+                    "\"" + archivo.getName() + "\" tiene cambios sin guardar.\n"
+                            + "Si no lo guardas, se compila la versión que está en disco.",
+                    "Cambios sin guardar", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE,
+                    null, opciones, opciones[0]);
+            if (op == 0) return guardarTab(tab, false);
+            return op == 1;
+        } catch (Exception ex) {
+            consola.mostrarMensaje("Error inesperado: " + ex);
+            return false;
+        }
+    }
+
+    /** Pestana abierta con `archivo`, o null. */
+    private EditorTab pestanaDe(File archivo) {
+        for (int i = 0; i < pestanas.getTabCount(); i++) {
+            File abierto = ((EditorTab) pestanas.getComponentAt(i)).getArchivo();
+            try {
+                if (abierto != null && abierto.getCanonicalFile().equals(archivo.getCanonicalFile()))
+                    return (EditorTab) pestanas.getComponentAt(i);
+            } catch (IOException ignorada) { }
+        }
+        return null;
     }
 
     public static void main(String[] args) {

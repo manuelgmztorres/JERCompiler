@@ -27,18 +27,20 @@ Con `-sourcepath`, `javac` compila `JERIde` y todo lo que usa; no hace falta lis
 - **Autocompletado de `() {} "" ''`** y **auto-indentado** (Enter copia la indentacion y agrega un nivel tras `{`; `}` en una linea en blanco quita un nivel).
 - **Atajos de edicion**: Ctrl+Z / Ctrl+Y deshacer-rehacer, Ctrl+Shift+Up/Down extiende la seleccion por linea, **Ctrl+/** (o Ctrl+7) comenta/descomenta con `#`, **Tab / Shift+Tab** indentan/desindentan las lineas seleccionadas, **Ctrl+rueda** cambia el tamano de la fuente.
 - **Buscar y reemplazar** (Ctrl+F / Ctrl+H): siguiente, anterior, reemplazar y reemplazar todo (un solo Ctrl+Z lo deshace), sin distinguir mayusculas.
-- **Guardar** (Ctrl+S) y **Guardar como** (Ctrl+Shift+S): el archivo nuevo sugiere `pruebas/` pero se puede elegir cualquier carpeta; se agrega `.txt` si no trae `.txt` ni `.jer`.
+- **Guardar** (Ctrl+S) y **Guardar como** (Ctrl+Shift+S): el archivo nuevo sugiere `pruebas/` pero se puede elegir cualquier carpeta; se agrega `.txt` si no lo trae (`.txt` es el unico formato de los programas JER; Abrir tambien filtra por `.txt`).
+- **Barra de herramientas por secciones**: **Archivo** (Nuevo, Abrir, Guardar, Guardar como) | **Edicion** (Buscar) | **Compilacion** (Compilar, Compilar compilador, Limpiar consola) y, a la derecha, **Vista** (Tres direcciones, Modo oscuro).
+- **Compilar compilador** (boton): corre `compilar.bat` (jjtree -> javacc -> javac) en la consola, con timeout de 120 s; la barra de estado dice "Compilador listo" o "Falló la compilación del compilador". Mientras corre (o mientras se compila un archivo) los dos botones de compilacion quedan desactivados.
 - **Compilar** (boton o **F5**): guarda si hace falta y corre `java -cp build JERCompiler <archivo>` en la consola del sistema (timeout de 30 s, la ventana no se congela). Con errores se abre la pestana **Errores**; sin errores la consola se queda en la pestana que estaba abierta (si era Errores, pasa a Salida). Clic en un error lleva el cursor a su linea y columna, y las lineas con error se marcan en rojo en el editor.
 - **Consola**, en el orden de las etapas del compilador: **Salida**, **Errores** (solo errores), **Tokens**, **Tabla de simbolos** y **Cuadruplos**.
-- **Salida = consola del sistema**: la pestana Salida es un `cmd.exe` real (en otros sistemas `/bin/sh`) abierto en la raiz del proyecto, con `chcp 65001` para UTF-8 y el `java` del IDE primero en el `PATH`. Se escribe despues del prompt y Enter manda el comando (flechas arriba/abajo: historial; Ctrl+C sin seleccion detiene el programa en curso; Ctrl+L o `cls` limpia). **Compilar** escribe `java -cp build JERCompiler <archivo>` en ese mismo shell, asi que el comando y su salida se ven ahi; los errores salen en rojo, las sugerencias `->` en amarillo y `Errores: 0` en verde. Clic en una linea con `Linea N, columna M` lleva el cursor ahi. Si el shell se cierra (`exit`), se reabre con el siguiente comando.
+- **Salida = consola del sistema**: la pestana Salida es un `cmd.exe` real (en otros sistemas `/bin/sh`) abierto en la raiz del proyecto, con `chcp 65001` para UTF-8 y el `java` del IDE primero en el `PATH`. Se escribe despues del prompt y Enter manda el comando (flechas arriba/abajo: historial; Ctrl+C sin seleccion detiene el programa en curso; Ctrl+L o `cls` limpia la pantalla y deja el prompt). **Compilar** escribe `java -cp build JERCompiler <archivo>` en ese mismo shell, asi que el comando y su salida se ven ahi; los errores salen en rojo, las sugerencias `->` en amarillo y `Errores: 0` en verde. Clic en una linea con `Linea N, columna M` lleva el cursor ahi. Si el shell se cierra (`exit`), se reabre con el siguiente comando. Un comando escrito a mano con `JERCompiler <archivo>` (por ejemplo `java -cp build JERCompiler pruebas\x.txt`) se trata como el boton Compilar: al dar Enter abre el archivo en el editor (si ya tenia una pestana con cambios sin guardar, pregunta: Guardar y compilar / Compilar sin guardar / Cancelar) y al terminar actualiza Errores, Tokens, Tabla de simbolos, Cuadruplos y las marcas del editor.
 - **Codigo de tres direcciones como documento**: el editor se parte en dos y a la derecha se muestra `cod_tres_dir.txt` con encabezado, numeros de linea y resaltado (`FUN`, etiquetas, saltos, temporales, cadenas). Se muestra/oculta con el boton **Tres direcciones**, **Ctrl+T** o la `x` del encabezado; el estado se recuerda entre sesiones.
 - **Tokens**: la tabla `No. | Lexema | Token | Linea | Columna` de `tabla_tokens.txt`; se carga en cada compilacion, aun con errores. Doble clic en un token lleva el cursor a su posicion.
 - **Tabla de simbolos y codigo intermedio**: si la compilacion termina con `Errores: 0`, la consola carga lo que el compilador dejo en `salida\`, solo si esos archivos son de esta compilacion (con errores, las pestanas se vacian en vez de mostrar los de una compilacion anterior):
   - **Tabla de simbolos**: la tabla `Nombre | Categoria | Tipo | Dimensiones | Ambito | Linea | Usado | Parametros` de `tabla_tipos.txt`. Doble clic en un simbolo lleva el cursor a la linea donde se declaro.
   - **Cuadruplos**: la tabla `Operador | Arg1 | Arg2 | Resultado` leida de `cuadruplos.txt`, con la cantidad de cuadruplos arriba, las filas `FUN` y `ETIQ` resaltadas y los saltos en azul. Doble clic en un `SALTO`/`SALTO_VER`/`SALTO_FAL` selecciona su `ETIQ`; doble clic en una `ETIQ` va al siguiente salto que llega a ella.
   - **Tres direcciones** (documento a la derecha del editor): `cod_tres_dir.txt`; doble clic sobre una etiqueta (`L3`) lleva a la linea `L3:`.
-- **Barra de estado**: estado de la compilacion (con el numero de cuadruplos) y `Ln/Col` del cursor. **Limpiar consola** vacia todas las pestanas y las marcas.
-- **Modo oscuro**: editor, numeros de linea, arbol, pestanas, consola, tablas y resaltado. El tema y los archivos abiertos se recuerdan entre sesiones.
+- **Barra de estado**: estado de la compilacion (con el numero de cuadruplos) y `Ln/Col` del cursor. **Limpiar consola** borra los resultados (Errores, Tokens, Tabla de simbolos, Cuadruplos, tres direcciones y las marcas del editor) y en Salida hace `cls`: limpia la pantalla y deja el prompt.
+- **Modo oscuro**: editor, numeros de linea, arbol, pestanas, consola, tablas y resaltado, y tambien los componentes estandar de Swing (botones, pestanas, barras de desplazamiento, divisores, separadores, dialogos y selector de archivos) con un tema Metal oscuro (`TemaSwing.java`; en modo claro se usa Ocean, el predeterminado). El tema y los archivos abiertos se recuerdan entre sesiones.
 
 ## Estructura
 
@@ -49,7 +51,7 @@ ide/
 ├─ clases/                         salida de javac (no se edita a mano)
 └─ src/ide/
    ├─ JERIde.java                  ventana principal
-   ├─ Tema.java
+   ├─ Tema.java / TemaSwing.java
    ├─ editor/                      EditorTab, NumeroLineaGutter, JERSyntaxHighlighter, DialogoBuscar
    ├─ proyecto/                    ArbolProyecto
    ├─ compilacion/                 EjecutorCompilador, ResultadoCompilacion
@@ -61,6 +63,7 @@ ide/
 |---|---|
 | `JERIde.java` | Ventana principal: toolbar, atajos, pestanas de editor partidas con el documento de tres direcciones, sesion, tema, abrir/guardar y la orquestacion de la compilacion. |
 | `Tema.java` | Paleta clara y oscura en un solo lugar; cada componente toma de aqui sus colores en `aplicarTema(Tema)`. |
+| `TemaSwing.java` | Look and feel de los componentes estandar de Swing: Metal/Ocean en claro y una paleta Metal oscura en oscuro; se reaplica a todas las ventanas al cambiar de tema. |
 | `editor/EditorTab.java` | Una pestana: `JTextPane`, undo/redo, autocompletado, indentado, comentar, buscar, zoom. |
 | `editor/NumeroLineaGutter.java` | Gutter de numeros de linea, alineado con la geometria real del editor. |
 | `editor/JERSyntaxHighlighter.java` | Coloreado de palabras clave, cadenas, comentarios y numeros. |

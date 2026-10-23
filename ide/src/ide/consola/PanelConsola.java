@@ -65,9 +65,9 @@ public class PanelConsola extends JTabbedPane {
         consolaErrores.setCaretPosition(0);
     }
 
-    /** Vacia todas las pestanas y el documento de tres direcciones. */
+    /** Vacia Errores, las tablas y el codigo intermedio, y hace "cls" en Salida (deja el prompt). */
     public void limpiar() {
-        consola.limpiar();
+        consola.cls();
         consolaErrores.setText("");
         tablas.limpiar();
         codigoIntermedio.limpiar("");
