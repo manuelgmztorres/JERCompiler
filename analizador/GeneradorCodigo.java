@@ -57,6 +57,9 @@ public final class GeneradorCodigo implements JERCompilerConstants {
   /** Construcciones que el programa usa y esta version todavia no traduce (vacio = tabla completa). */
   public Set<String> noSoportado() { return Collections.unmodifiableSet(noSoportado); }
 
+  /** Nombres del ambito global; el optimizador los invalida en cada LLAMAR (el callee puede cambiarlos). */
+  public Set<String> nombresGlobales() { return Collections.unmodifiableSet(nombresGlobales); }
+
   public TablaCuadruplos generar(ASTPrograma raiz) {
     List<Node> globales = declaracionesGlobales(raiz);
     generarInicio(!globales.isEmpty());

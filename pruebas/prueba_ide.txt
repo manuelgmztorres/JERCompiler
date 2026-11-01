@@ -5,5 +5,5 @@ CONST ENT n3 -> 8;
 FUN VACIO principal(){
     IMP "Hola Mundo";
     ENT resta -> n1 - n2 - n3;
-    IMP resta
+    IMP resta;
 }

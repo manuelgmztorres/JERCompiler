@@ -1087,6 +1087,22 @@ public final class ManejadorErrores implements JERCompilerConstants {
     try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(listado), StandardCharsets.UTF_8))) {
       writer.print(cuadruplos.formatearListado(nombreArchivo));
     } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar el listado: " + e.getMessage()); }
+
+    // Optimizacion local (folding y propagacion de constantes). La tabla original no se modifica.
+    OptimizadorCuadruplos optimizador = new OptimizadorCuadruplos(generador.nombresGlobales());
+    TablaCuadruplos optimizada = optimizador.optimizar(cuadruplos);
+    String textoOptimizado = optimizada.formatear(nombreArchivo);
+    System.out.println("CÓDIGO INTERMEDIO OPTIMIZADO (" + optimizador.plegados() + " operaciones plegadas, " + optimizador.propagados() + " operandos propagados)");
+    System.out.println(textoOptimizado);
+    guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cuadruplos_opt.txt"), textoOptimizado, "los cuádruplos optimizados");
+    guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cod_tres_dir_opt.txt"), optimizada.formatearListado(nombreArchivo), "el listado optimizado");
+  }
+
+  private static void guardarTexto(String ruta, String texto, String que) {
+    File archivo = new File(ruta), directorio = archivo.getParentFile(); if (directorio != null && !directorio.exists()) directorio.mkdirs();
+    try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(archivo), StandardCharsets.UTF_8))) {
+      writer.print(texto);
+    } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar " + que + ": " + e.getMessage()); }
   }
 
   private static String formatearTablaDeTipos(String nombreArchivo, TablaSimbolos tabla) {

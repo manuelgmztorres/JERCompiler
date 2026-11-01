@@ -1,0 +1,30 @@
+CÓDIGO DE TRES DIRECCIONES - JERCompiler
+Archivo: pruebas\prueba_revision1.txt
+
+FUN _inicio
+        LLAMAR _global, 0
+        LLAMAR principal, 0
+        RET
+
+FUN _global
+        g = 0
+        RET
+
+FUN cambiar
+        g = 7
+        RET
+
+FUN principal
+        a = 0
+        OBT a
+        b = a + 1
+        LLAMAR cambiar, 0
+        c = g * 2
+  L1:   t1 = a < 3
+        SALTO_FAL t1, L2
+        a = a + 1
+        SALTO L1
+  L2:   t2 = b + c
+        IMP t2
+        RET
+--------------------------------------------
