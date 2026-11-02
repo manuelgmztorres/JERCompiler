@@ -1088,6 +1088,9 @@ public final class ManejadorErrores implements JERCompilerConstants {
       writer.print(cuadruplos.formatearListado(nombreArchivo));
     } catch (IOException e) { System.out.println("[ADVERTENCIA] No se pudo guardar el listado: " + e.getMessage()); }
 
+    // El mismo listado dividido en bloques basicos (las unidades sobre las que trabaja el optimizador).
+    guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "bloques_basicos.txt"), cuadruplos.formatearBloques(nombreArchivo), "los bloques básicos");
+
     // Optimizacion local (folding y propagacion de constantes). La tabla original no se modifica.
     OptimizadorCuadruplos optimizador = new OptimizadorCuadruplos(generador.nombresGlobales());
     TablaCuadruplos optimizada = optimizador.optimizar(cuadruplos);

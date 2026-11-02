@@ -63,6 +63,8 @@ Cuando el análisis termina con **0 errores**, el compilador genera el código i
 
 * **`salida\cuadruplos.txt`** (también se imprime en consola): la tabla de cuádruplos, con las cuatro columnas `Operador | Arg1 | Arg2 | Resultado`. Las celdas que no aplican quedan en blanco.
 * **`salida\cod_tres_dir.txt`**: el código de tres direcciones, la misma tabla escrita como instrucciones (`t1 = i < 3`, `SALTO_FAL t1, L2`). Cada fila de la tabla es una línea del listado.
+* **`salida\bloques_basicos.txt`**: el mismo código de tres direcciones dividido en bloques básicos. Es líder la primera instrucción de cada `FUN`, cada etiqueta (`ETIQ`) y la instrucción que sigue a un `SALTO`/`SALTO_VER`/`SALTO_FAL` o `RET` (las mismas reglas que usa el optimizador). Cada bloque se encabeza con `[B3]  -> B4, B5`: sus sucesores en el grafo de flujo (`-> fin` si termina la función).
+* **`salida\cuadruplos_opt.txt`** y **`salida\cod_tres_dir_opt.txt`**: la tabla y el código de tres direcciones después de la optimización local (plegado y propagación de constantes dentro de cada bloque básico, `OptimizadorCuadruplos`). Tienen las mismas filas y etiquetas que la versión sin optimizar.
 
 Ejemplo (`pruebas\prueba_revision2.txt`):
 

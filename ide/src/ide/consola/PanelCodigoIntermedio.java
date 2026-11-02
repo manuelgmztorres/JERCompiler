@@ -10,7 +10,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -113,9 +115,11 @@ public class PanelCodigoIntermedio {
     }
 
     /**
-     * Carga salida/cuadruplos.txt y salida/cod_tres_dir.txt. El compilador
-     * solo los reescribe con 0 errores; con errores conservan los de una compilacion anterior, asi que
-     * se cargan solo si la compilacion termino sin errores y los archivos son de esta compilacion.
+     * Carga salida/cuadruplos.txt y las vistas del documento (cod_tres_dir.txt, cod_tres_dir_opt.txt y
+     * bloques_basicos.txt). El compilador solo los reescribe con 0 errores; con errores conservan los
+     * de una compilacion anterior, asi que se cargan solo si la compilacion termino sin errores y los
+     * archivos son de esta compilacion. La tabla y el codigo sin optimizar son obligatorios; si falta
+     * el optimizado o los bloques (un compilador anterior que no los genera), esa vista muestra un aviso.
      * `fuente` es el nombre del archivo compilado (subtitulo del documento).
      * Devuelve true si hay codigo intermedio para mostrar.
      */
@@ -125,7 +129,7 @@ public class PanelCodigoIntermedio {
             return false;
         }
         File cuadruplos = new File(carpetaSalida, "cuadruplos.txt");
-        File tresDir = new File(carpetaSalida, "cod_tres_dir.txt");
+        File tresDir = new File(carpetaSalida, DocumentoTresDirecciones.Vista.SIN_OPTIMIZAR.archivo);
         if (!esDeEstaCompilacion(cuadruplos, inicio) || !esDeEstaCompilacion(tresDir, inicio)) {
             limpiar(" Sin código intermedio: el compilador no generó salida" + File.separator + " en esta compilación.");
             return false;
@@ -134,7 +138,18 @@ public class PanelCodigoIntermedio {
             List<String[]> filas = LectorCuadruplos.leer(cuadruplos);
             limpiar(" " + filas.size() + " cuádruplo(s).");
             for (String[] fila : filas) modelo.addRow(fila);
-            documento.mostrar(LectorCuadruplos.leerTexto(tresDir), "salida" + File.separator + tresDir.getName() + "  ·  " + fuente);
+            Map<DocumentoTresDirecciones.Vista, String> textos = new EnumMap<>(DocumentoTresDirecciones.Vista.class);
+            Map<DocumentoTresDirecciones.Vista, String> avisos = new EnumMap<>(DocumentoTresDirecciones.Vista.class);
+            for (DocumentoTresDirecciones.Vista v : DocumentoTresDirecciones.Vista.values()) {
+                File f = new File(carpetaSalida, v.archivo);
+                if (esDeEstaCompilacion(f, inicio)) {
+                    textos.put(v, LectorCuadruplos.leerTexto(f));
+                } else {
+                    avisos.put(v, "El compilador no generó salida" + File.separator + v.archivo + " en esta compilación.\n"
+                            + "Recompila el compilador (Compilar compilador) para obtener esta vista.");
+                }
+            }
+            documento.mostrar(textos, avisos, fuente);
             return true;
         } catch (IOException e) {
             limpiar(" No se pudo leer el código intermedio: " + e.getMessage());

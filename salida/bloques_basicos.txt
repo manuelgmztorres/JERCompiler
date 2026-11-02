@@ -1,0 +1,16 @@
+BLOQUES BÁSICOS - JERCompiler
+Archivo: pruebas/prueba_optimizacion.txt
+Bloques: 2
+
+FUN _inicio
+  [B1]  -> fin
+        LLAMAR principal, 0
+        RET
+
+FUN principal
+  [B2]  -> fin
+        suma = 3
+        i = 4
+        total = suma + 7
+        RET
+--------------------------------------------

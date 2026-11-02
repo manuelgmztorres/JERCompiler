@@ -1,30 +1,13 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: pruebas\prueba_revision1.txt
-Operador  | Arg1      | Arg2 | Resultado
-----------+-----------+------+----------
-FUN       | _inicio   |      |
-LLAMAR    | _global   | 0    |
-LLAMAR    | principal | 0    |
-RET       |           |      |
-FUN       | _global   |      |
-ASIG      | 0         |      | g
-RET       |           |      |
-FUN       | cambiar   |      |
-ASIG      | 7         |      | g
-RET       |           |      |
-FUN       | principal |      |
-ASIG      | 0         |      | a
-OBT       |           |      | a
-+         | a         | 1    | b
-LLAMAR    | cambiar   | 0    |
-*         | g         | 2    | c
-ETIQ      |           |      | L1
-<         | a         | 3    | t1
-SALTO_FAL | t1        |      | L2
-+         | a         | 1    | a
-SALTO     |           |      | L1
-ETIQ      |           |      | L2
-+         | b         | c    | t2
-IMP       | t2        |      |
-RET       |           |      |
+Archivo: pruebas/prueba_optimizacion.txt
+Operador | Arg1      | Arg2 | Resultado
+---------+-----------+------+----------
+FUN      | _inicio   |      |
+LLAMAR   | principal | 0    |
+RET      |           |      |
+FUN      | principal |      |
+ASIG     | 3         |      | suma
+ASIG     | 4         |      | i
++        | suma      | 7    | total
+RET      |           |      |
 --------------------------------------------

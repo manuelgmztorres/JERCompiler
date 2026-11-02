@@ -2,6 +2,7 @@ package ide;
 
 import ide.compilacion.EjecutorCompilador;
 import ide.compilacion.ResultadoCompilacion;
+import ide.consola.DocumentoTresDirecciones;
 import ide.consola.PanelConsola;
 import ide.editor.DialogoBuscar;
 import ide.editor.EditorTab;
@@ -11,12 +12,15 @@ import ide.proyecto.ArbolProyecto;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.EnumMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.prefs.Preferences;
@@ -48,7 +52,8 @@ public class JERIde extends JFrame {
     private final JButton btnCompilar = new JButton("Compilar");
     private final JButton btnCompilarCompilador = new JButton("Compilar compilador");
     private final JToggleButton btnModoOscuro = new JToggleButton("Modo oscuro");
-    private final JToggleButton btnTresDir = new JToggleButton("Tres direcciones", true);
+    /** Un boton por vista del codigo intermedio: abre el documento en esa vista, o lo oculta si ya la muestra. */
+    private final Map<DocumentoTresDirecciones.Vista, JToggleButton> botonesVista = new EnumMap<>(DocumentoTresDirecciones.Vista.class);
     private final JFileChooser chooser = new JFileChooser();
     private final FileNameExtensionFilter filtroAbrir = new FileNameExtensionFilter("Archivos JER (*.txt)", "txt");
 
@@ -68,6 +73,7 @@ public class JERIde extends JFrame {
         setSize(1100, 750);
         setIconImage(crearIcono());
 
+        BloqMayus.instalar(); // Bloq Mayus que se aplica tarde en XWayland
         carpetaPruebas.mkdirs();
         chooser.setFileFilter(filtroAbrir);
 
@@ -93,8 +99,19 @@ public class JERIde extends JFrame {
         btnLimpiar.addActionListener(e -> limpiarConsola());
         btnLimpiar.setToolTipText("Borrar los resultados de la compilación y hacer cls en Salida");
         btnModoOscuro.addActionListener(e -> conRedDeSeguridad(() -> aplicarTema(Tema.de(btnModoOscuro.isSelected()))));
-        btnTresDir.setToolTipText("Mostrar u ocultar el código de tres direcciones junto al editor (Ctrl+T)");
-        btnTresDir.addActionListener(e -> mostrarTresDir(btnTresDir.isSelected()));
+        String[][] vistas = {
+                { "Tres dir.", "Código de tres direcciones sin optimizar junto al editor (Ctrl+T muestra u oculta el panel)" },
+                { "Optimizado", "Código de tres direcciones optimizado, con las líneas que cambiaron resaltadas" },
+                { "Bloques", "Código de tres direcciones dividido en bloques básicos" },
+                { "Grafo", "Grafo de flujo de control de los bloques básicos" } };
+        for (DocumentoTresDirecciones.Vista v : DocumentoTresDirecciones.Vista.values()) {
+            JToggleButton b = new JToggleButton(vistas[v.ordinal()][0]);
+            b.setToolTipText(vistas[v.ordinal()][1]);
+            b.setMargin(new Insets(2, 8, 2, 8)); // compactos: son cuatro en la barra
+            b.addActionListener(e -> conRedDeSeguridad(() -> alternarVista(v)));
+            botonesVista.put(v, b);
+        }
+        consola.codigoIntermedio().documento().setAlCambiarVista(v -> actualizarBotonesVista());
 
         // Secciones: Archivo | Edicion | Compilacion a la izquierda; Vista a la derecha.
         JPanel izquierda = panelToolbar(FlowLayout.LEFT);
@@ -104,9 +121,17 @@ public class JERIde extends JFrame {
         izquierda.add(separadorToolbar());
         agregarSeccion(izquierda, btnCompilar, btnCompilarCompilador, btnLimpiar);
         JPanel derecha = panelToolbar(FlowLayout.RIGHT);
-        agregarSeccion(derecha, btnTresDir, btnModoOscuro);
+        agregarSeccion(derecha, botonesVista.values().toArray(new JComponent[0]));
+        derecha.add(separadorToolbar());
+        agregarSeccion(derecha, btnModoOscuro);
         toolbar.add(izquierda, BorderLayout.CENTER);
         toolbar.add(derecha, BorderLayout.EAST);
+        // El alto de la barra depende de cuantas filas ocupan los botones: se recalcula al cambiar el ancho.
+        toolbar.addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) {
+                SwingUtilities.invokeLater(() -> { izquierda.revalidate(); toolbar.revalidate(); });
+            }
+        });
 
         etiquetaPosicion.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 8));
         barraEstado.add(etiquetaEstado, BorderLayout.WEST);
@@ -135,7 +160,7 @@ public class JERIde extends JFrame {
         atajo(KeyEvent.VK_F, ctrl, "buscarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_H, ctrl, "reemplazarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_F5, 0, "compilarAtajo", () -> { if (btnCompilar.isEnabled()) compilar(); });
-        atajo(KeyEvent.VK_T, ctrl, "tresDirAtajo", () -> mostrarTresDir(!btnTresDir.isSelected()));
+        atajo(KeyEvent.VK_T, ctrl, "tresDirAtajo", () -> mostrarTresDir(!consola.codigoIntermedio().documento().isVisible()));
 
 
         pestanas.addChangeListener(e -> actualizarPosicion());
@@ -165,7 +190,7 @@ public class JERIde extends JFrame {
 
     /** Panel transparente de la barra de herramientas (toma el fondo del tema de `toolbar`). */
     private static JPanel panelToolbar(int alineacion) {
-        JPanel p = new JPanel(new FlowLayout(alineacion, 5, 5));
+        JPanel p = new JPanel(new WrapLayout(alineacion, 5, 5)); // si no caben, pasan a otra fila
         p.setOpaque(false);
         return p;
     }
@@ -204,6 +229,11 @@ public class JERIde extends JFrame {
     private void restaurarSesion() {
         if (!prefs.getBoolean("tresDir", true)) mostrarTresDir(false);
         else SwingUtilities.invokeLater(() -> splitEditor.setDividerLocation(proporcionTresDir));
+        try {
+            consola.codigoIntermedio().documento().setVista(
+                    DocumentoTresDirecciones.Vista.valueOf(prefs.get("vistaTresDir", DocumentoTresDirecciones.Vista.SIN_OPTIMIZAR.name())));
+        } catch (IllegalArgumentException ignorada) { } // valor de una version anterior
+        actualizarBotonesVista();
         if (prefs.getBoolean("oscuro", false)) {
             btnModoOscuro.setSelected(true);
             aplicarTema(Tema.OSCURO);
@@ -222,7 +252,8 @@ public class JERIde extends JFrame {
             if (f != null) abiertos.append(abiertos.length() > 0 ? "|" : "").append(f.getAbsolutePath());
         }
         prefs.putBoolean("oscuro", tema.oscuro);
-        prefs.putBoolean("tresDir", btnTresDir.isSelected());
+        prefs.putBoolean("tresDir", consola.codigoIntermedio().documento().isVisible());
+        prefs.put("vistaTresDir", consola.codigoIntermedio().documento().vista().name());
         prefs.put("abiertos", abiertos.toString());
     }
 
@@ -394,9 +425,8 @@ public class JERIde extends JFrame {
 
     /** Muestra u oculta el documento de tres direcciones a la derecha del editor, conservando su ancho. */
     private void mostrarTresDir(boolean mostrar) {
-        btnTresDir.setSelected(mostrar);
         JComponent documento = consola.codigoIntermedio().documento();
-        if (documento.isVisible() == mostrar) return;
+        if (documento.isVisible() == mostrar) { actualizarBotonesVista(); return; }
         if (!mostrar && splitEditor.getWidth() > 0) {
             proporcionTresDir = (double) splitEditor.getDividerLocation() / splitEditor.getWidth();
         }
@@ -408,6 +438,24 @@ public class JERIde extends JFrame {
             splitEditor.setDividerSize(0);
         }
         splitEditor.revalidate();
+        actualizarBotonesVista();
+    }
+
+    /** Boton de una vista: la abre (mostrando el documento si estaba oculto) o, si ya se ve, oculta el documento. */
+    private void alternarVista(DocumentoTresDirecciones.Vista v) {
+        DocumentoTresDirecciones documento = consola.codigoIntermedio().documento();
+        if (documento.isVisible() && documento.vista() == v) {
+            mostrarTresDir(false);
+        } else {
+            documento.setVista(v);
+            mostrarTresDir(true);
+        }
+    }
+
+    /** Marca solo el boton de la vista visible (ninguno si el documento esta oculto). */
+    private void actualizarBotonesVista() {
+        DocumentoTresDirecciones documento = consola.codigoIntermedio().documento();
+        botonesVista.forEach((v, b) -> b.setSelected(documento.isVisible() && documento.vista() == v));
     }
 
     // ---------- buscar ----------

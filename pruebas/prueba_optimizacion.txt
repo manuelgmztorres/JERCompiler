@@ -1,0 +1,5 @@
+FUN VACIO principal(){
+    ENT suma -> 3;
+    ENT i -> 4;
+    ENT total -> suma + 7;
+}

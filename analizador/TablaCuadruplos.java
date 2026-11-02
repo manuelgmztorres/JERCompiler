@@ -180,6 +180,114 @@ public final class TablaCuadruplos {
     return buffer.toString();
   }
 
+  // Bloques basicos
+
+  /** Un bloque basico: sus filas (las ETIQ incluidas, al inicio) y la funcion a la que pertenece. */
+  private static final class Bloque {
+    final int numero;
+    final String funcion;
+    final List<Cuadruplo> filas = new ArrayList<Cuadruplo>();
+    Bloque(int numero, String funcion) { this.numero = numero; this.funcion = funcion; }
+
+    /** Ya tiene alguna instruccion (no solo etiquetas). */
+    boolean tieneInstrucciones() {
+      for (Cuadruplo f : filas) if (!f.operador.equals("ETIQ")) return true;
+      return false;
+    }
+
+    /** La ultima instruccion del bloque (no ETIQ), o null si solo tiene etiquetas. */
+    Cuadruplo ultima() {
+      for (int i = filas.size() - 1; i >= 0; i--) if (!filas.get(i).operador.equals("ETIQ")) return filas.get(i);
+      return null;
+    }
+  }
+
+  /**
+   * Particion de la tabla en bloques basicos, con las mismas reglas de lider que usa
+   * OptimizadorCuadruplos: empieza un bloque la primera instruccion de cada FUN, cada fila ETIQ
+   * (destino de un salto; varias etiquetas seguidas son un solo lider) y la fila que sigue a un
+   * SALTO, SALTO_VER, SALTO_FAL o RET. La tabla debe estar cerrada.
+   */
+  private List<Bloque> bloques() {
+    List<Bloque> bloques = new ArrayList<Bloque>();
+    Bloque actual = null;
+    String funcion = null;
+    for (Cuadruplo f : filas) {
+      String op = f.operador;
+      if (op.equals("FUN")) { funcion = f.arg1; actual = null; continue; }
+      boolean lider = actual == null || (op.equals("ETIQ") && actual.tieneInstrucciones());
+      if (lider) { actual = new Bloque(bloques.size() + 1, funcion); bloques.add(actual); }
+      actual.filas.add(f);
+      if (op.startsWith("SALTO") || op.equals("RET")) actual = null; // la fila siguiente es lider
+    }
+    return bloques;
+  }
+
+  /**
+   * Sucesores de cada bloque en el grafo de flujo: el bloque de la etiqueta destino de un salto y,
+   * si la ultima instruccion no es SALTO ni RET, el bloque siguiente de la misma funcion.
+   */
+  private static List<List<Integer>> sucesores(List<Bloque> bloques) {
+    Map<String, Integer> bloqueDeEtiqueta = new HashMap<String, Integer>();
+    for (Bloque b : bloques) {
+      for (Cuadruplo f : b.filas) if (f.operador.equals("ETIQ")) bloqueDeEtiqueta.put(f.resultado, b.numero);
+    }
+    List<List<Integer>> sucesores = new ArrayList<List<Integer>>();
+    for (int i = 0; i < bloques.size(); i++) {
+      Bloque b = bloques.get(i);
+      Cuadruplo ultima = b.ultima();
+      String op = ultima == null ? "" : ultima.operador;
+      List<Integer> s = new ArrayList<Integer>();
+      if (op.startsWith("SALTO") && bloqueDeEtiqueta.containsKey(ultima.resultado)) s.add(bloqueDeEtiqueta.get(ultima.resultado));
+      boolean continua = !op.equals("SALTO") && !op.equals("RET");
+      if (continua && i + 1 < bloques.size() && Objects.equals(bloques.get(i + 1).funcion, b.funcion)) {
+        if (!s.contains(b.numero + 1)) s.add(b.numero + 1);
+      }
+      Collections.sort(s);
+      sucesores.add(s);
+    }
+    return sucesores;
+  }
+
+  /**
+   * El codigo de tres direcciones dividido en bloques basicos (ver bloques()). Cada bloque empieza
+   * con una linea `[B3]  -> B4, B5` (sus sucesores en el grafo de flujo; `-> fin` si termina la
+   * funcion) y sus instrucciones se escriben igual que en formatearListado(). La tabla debe estar cerrada.
+   */
+  public String formatearBloques(String nombreArchivo) {
+    List<Bloque> bloques = bloques();
+    List<List<Integer>> sucesores = sucesores(bloques);
+    StringWriter buffer = new StringWriter();
+    PrintWriter w = new PrintWriter(buffer);
+    w.println("BLOQUES BÁSICOS - JERCompiler"); w.println("Archivo: " + nombreArchivo);
+    w.println("Bloques: " + bloques.size());
+    String funcion = null;
+    for (Bloque b : bloques) {
+      if (funcion == null || !funcion.equals(b.funcion)) {
+        w.println();
+        w.println("FUN " + b.funcion);
+        funcion = b.funcion;
+      }
+      List<Integer> s = sucesores.get(b.numero - 1);
+      StringBuilder destinos = new StringBuilder();
+      for (int n : s) destinos.append(destinos.length() == 0 ? "B" : ", B").append(n);
+      w.println("  [B" + b.numero + "]  -> " + (s.isEmpty() ? "fin" : destinos));
+      String etiquetaPendiente = null;
+      for (Cuadruplo f : b.filas) {
+        if (f.operador.equals("ETIQ")) {
+          if (etiquetaPendiente != null) w.println(margen(etiquetaPendiente).stripTrailing()); // etiquetas seguidas
+          etiquetaPendiente = f.resultado;
+          continue;
+        }
+        w.println(margen(etiquetaPendiente) + instruccion(f));
+        etiquetaPendiente = null;
+      }
+      if (etiquetaPendiente != null) w.println(margen(etiquetaPendiente).stripTrailing());
+    }
+    w.println("--------------------------------------------");
+    return buffer.toString();
+  }
+
   /** Ocho espacios, o `  L1:   ` cuando la linea es destino de un salto. */
   private static String margen(String etiqueta) {
     if (etiqueta == null) return " ".repeat(ANCHO_SANGRIA);
