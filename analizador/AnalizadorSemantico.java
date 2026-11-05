@@ -211,28 +211,169 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   /**
-   * Errores de ejecucion que ya se ven al compilar porque el operando derecho es un literal: divisor
-   * 0 en '/' y '%', raiz de indice 0 en '//' y exponente negativo en una potencia entre ENT. Solo mira
-   * el literal escrito; los casos que dependen de valores calculados se dejan para la ejecucion.
+   * Errores de ejecucion que ya se ven al compilar porque se conoce el operando derecho: divisor 0 en
+   * '/' y '%', raiz de indice 0 en '//' y exponente negativo en una potencia entre ENT. El operando
+   * puede ser un literal o tener un valor conocido por propagacion de constantes (ver valorEstatico());
+   * los casos que dependen de valores que solo existen al ejecutar (OBT, parametros, bucles) no se
+   * pueden detectar aqui.
    */
   private void validarOperandoDerechoLiteral(Node izquierdo, Node derecho, TablaSimbolos.TipoDato tipo) {
     Token operador = operadorDespuesDe(izquierdo);
     if (operador == null) return;
+    // Si el operando no es un literal, se intenta con su valor conocido (propagacion de constantes):
+    // una CONST, una variable con un valor seguro en este punto o una expresion de ambas.
+    Object conocido = valorEstatico(derecho);
     switch (operador.kind) {
       case DIV: case MODULO:
         if (esCeroLiteral(derecho)) ManejadorErrores.reportarDivisionPorCero(operador);
+        else if (esCero(conocido)) ManejadorErrores.reportarDivisionPorCeroConocida(operador, textoDe(derecho));
         break;
       case RAIZ:
         if (esCeroLiteral(derecho)) ManejadorErrores.reportarRaizDeIndiceCero(operador);
+        else if (esCero(conocido)) ManejadorErrores.reportarRaizDeIndiceCeroConocido(operador, textoDe(derecho));
         break;
       case POTENCIA: {
+        if (tipo != TablaSimbolos.TipoDato.ENT) break;
         Long exponente = enteroLiteral(derecho);
-        if (tipo == TablaSimbolos.TipoDato.ENT && exponente != null && exponente < 0) ManejadorErrores.reportarExponenteNegativoEnEntero(operador);
+        if (exponente != null) {
+          if (exponente < 0) ManejadorErrores.reportarExponenteNegativoEnEntero(operador);
+        } else if (conocido instanceof Long && (Long) conocido < 0) {
+          ManejadorErrores.reportarExponenteNegativoConocido(operador, textoDe(derecho), (Long) conocido);
+        }
         break;
       }
       default:
         break;
     }
+  }
+
+  // Propagacion de constantes
+  //
+  // `valores` guarda, para cada escalar ENT/DEC, el valor que tiene con certeza en el punto del
+  // recorrido donde va el visitor (Long para ENT, Double para DEC). Si un simbolo no esta, su valor
+  // es desconocido. Solo sirve para detectar en compilacion errores de ejecucion seguros (divisor 0,
+  // raiz de indice 0, exponente ENT negativo) cuando el operando no es un literal.
+  //
+  // Reglas: una declaracion o asignacion fija el valor (o lo borra si la expresion no se puede
+  // evaluar); OBT, el paso de REPETIR y un ++/-- sobre un valor desconocido lo borran; al salir de un
+  // SI se conservan solo los valores iguales en todas sus ramas; antes de un bucle o un EVALUAR se
+  // borra toda variable que se asigne dentro de el. Dentro de una funcion solo se conocen las CONST y
+  // las locales: los parametros llegan con cualquier valor y los globales pueden cambiar en cualquier
+  // otra funcion. Los arreglos nunca se rastrean.
+  private Map<TablaSimbolos.Simbolo, Object> valores = new HashMap<TablaSimbolos.Simbolo, Object>();
+
+  private static boolean esCero(Object valor) {
+    return (valor instanceof Long && (Long) valor == 0L) || (valor instanceof Double && (Double) valor == 0.0);
+  }
+
+  /**
+   * Valor de una expresion aritmetica si se conoce al compilar: literales ENT/DEC, escalares con valor
+   * en `valores`, '-' unario y + - * / % entre ellos. null si cualquier parte es desconocida, si se
+   * mezclan ENT y DEC, si hay desbordamiento o si es '**' o '//'. Debe llamarse despues de visitar el
+   * nodo, porque usa el simbolo que su Anotacion ya resolvio (respetando el shadowing).
+   */
+  private Object valorEstatico(Node nodo) {
+    if (nodo instanceof ASTValorSimple) {
+      if (nodo.jjtGetNumChildren() != 0) return null; // acceso a arreglo
+      Token t = ((SimpleNode) nodo).jjtGetFirstToken();
+      try {
+        if (t.kind == NUMERO_ENTERO) return Long.parseLong(t.image);
+        if (t.kind == NUMERO_DECIMAL) return Double.parseDouble(t.image);
+      } catch (NumberFormatException e) { return null; }
+      if (t.kind != IDENTIFICADOR) return null;
+      Anotacion a = Anotacion.de(nodo);
+      return a == null || a.simbolo == null ? null : valores.get(a.simbolo);
+    }
+    if (nodo instanceof ASTUnaryMinus && nodo.jjtGetNumChildren() == 1) {
+      Object v = valorEstatico(nodo.jjtGetChild(0));
+      if (v instanceof Long) return (Long) v == Long.MIN_VALUE ? null : -(Long) v;
+      if (v instanceof Double) return -(Double) v;
+      return null;
+    }
+    if (nodo instanceof ASTExpresion || nodo instanceof ASTTermino || nodo instanceof ASTFactor) {
+      Object acumulado = valorEstatico(nodo.jjtGetChild(0));
+      for (int i = 1; acumulado != null && i < nodo.jjtGetNumChildren(); i++) {
+        Token operador = operadorDespuesDe(nodo.jjtGetChild(i - 1));
+        if (operador == null) return null;
+        acumulado = operar(acumulado, operador.kind, valorEstatico(nodo.jjtGetChild(i)));
+      }
+      return acumulado;
+    }
+    return null; // llamadas, arreglos, comparaciones, CAD/CAR/BOO
+  }
+
+  /** `a op b` con la semantica de JER (sin conversion ENT<->DEC); null si no se puede calcular. */
+  private static Object operar(Object a, int operador, Object b) {
+    if (a == null || b == null) return null;
+    try {
+      if (a instanceof Long && b instanceof Long) {
+        long x = (Long) a, y = (Long) b;
+        switch (operador) {
+          case SUMA: return Math.addExact(x, y);
+          case RESTA: return Math.subtractExact(x, y);
+          case MULT: return Math.multiplyExact(x, y);
+          case DIV: return y == 0 ? null : x / y;
+          case MODULO: return y == 0 ? null : x % y;
+          default: return null;
+        }
+      }
+      if (a instanceof Double && b instanceof Double) {
+        double x = (Double) a, y = (Double) b;
+        switch (operador) {
+          case SUMA: return x + y;
+          case RESTA: return x - y;
+          case MULT: return x * y;
+          case DIV: return y == 0.0 ? null : x / y;
+          case MODULO: return y == 0.0 ? null : x % y;
+          default: return null;
+        }
+      }
+    } catch (ArithmeticException e) {
+      return null; // desbordamiento de ENT: mejor no afirmar nada
+    }
+    return null;
+  }
+
+  /** Registra el valor de un escalar ENT/DEC; null (o un valor de otro tipo) lo deja desconocido. */
+  private void fijarValor(TablaSimbolos.Simbolo simbolo, Object valor) {
+    if (simbolo == null || simbolo.aridadArreglo != 0) return;
+    boolean tipoOk = (simbolo.tipo == TablaSimbolos.TipoDato.ENT && valor instanceof Long)
+        || (simbolo.tipo == TablaSimbolos.TipoDato.DEC && valor instanceof Double);
+    if (tipoOk) valores.put(simbolo, valor); else valores.remove(simbolo);
+  }
+
+  /** Valores que coinciden en los dos estados: lo unico seguro despues de que dos caminos se juntan. */
+  private static Map<TablaSimbolos.Simbolo, Object> interseccion(Map<TablaSimbolos.Simbolo, Object> a, Map<TablaSimbolos.Simbolo, Object> b) {
+    Map<TablaSimbolos.Simbolo, Object> r = new HashMap<TablaSimbolos.Simbolo, Object>();
+    for (Map.Entry<TablaSimbolos.Simbolo, Object> e : a.entrySet()) {
+      if (e.getValue().equals(b.get(e.getKey()))) r.put(e.getKey(), e.getValue());
+    }
+    return r;
+  }
+
+  /**
+   * Antes de un bucle o un EVALUAR: borra el valor de toda variable que se asigne en algun lugar de
+   * `subarbol` (asignacion, ++/--, OBT, paso de REPETIR). Compara por nombre, sin resolver scopes:
+   * con shadowing puede borrar de mas, que es lo seguro. Las CONST no se tocan.
+   */
+  private void olvidarAsignadasEn(Node subarbol) {
+    Set<String> nombres = new HashSet<String>();
+    recolectarAsignadas(subarbol, nombres);
+    if (nombres.isEmpty()) return;
+    valores.keySet().removeIf(s -> s.categoria != TablaSimbolos.Categoria.CONSTANTE && nombres.contains(s.nombre));
+  }
+
+  private static void recolectarAsignadas(Node nodo, Set<String> nombres) {
+    if (nodo == null) return;
+    Token primero = ((SimpleNode) nodo).jjtGetFirstToken();
+    if (nodo instanceof ASTAsignacionOLlamada || nodo instanceof ASTPasoRepetir) {
+      Token sig = siguiente(primero);
+      if (sig != null && sig.kind != APERTURA_PAREN) nombres.add(primero.image);
+    } else if (nodo instanceof ASTSentenciaObtener) {
+      Token id = siguiente(primero);
+      if (id != null) nombres.add(id.image);
+    }
+    for (int i = 0; i < nodo.jjtGetNumChildren(); i++) recolectarAsignadas(nodo.jjtGetChild(i), nombres);
   }
 
   /**
@@ -348,11 +489,16 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       nodo.jjtGetChild(indice).jjtAccept(this, data); // valida que cada dimension sea ENT
       indice++;
     }
-    if (indice >= n) return; // sin inicializador (variable sin valor; CONST no llega aqui, siempre lo exige)
+    if (indice >= n) { // sin inicializador (variable sin valor; CONST no llega aqui, siempre lo exige)
+      // El generador la inicializa con el valor por defecto del tipo (0 / 0.0).
+      if (esDuenaDelSimbolo) fijarValor(simbolo, simbolo.tipo == TablaSimbolos.TipoDato.DEC ? (Object) 0.0 : (Object) 0L);
+      return;
+    }
     Node inicializador = nodo.jjtGetChild(indice);
     Object dataInicializador = esDuenaDelSimbolo && simbolo.aridadArreglo > 0 && inicializador instanceof ASTLiteralArreglo
         ? new ContextoTamanioArreglo(simbolo.tamanios, 1, simbolo.nombre) : data;
     TablaSimbolos.TipoDato tipoInicializador = (TablaSimbolos.TipoDato) inicializador.jjtAccept(this, dataInicializador);
+    if (esDuenaDelSimbolo) fijarValor(simbolo, valorEstatico(inicializador));
     // Un arreglo solo se inicializa con un literal '[...]' y una variable simple nunca con uno.
     // Si la forma no coincide, el choque de tipos de abajo seria un segundo error por lo mismo.
     boolean esLiteralArreglo = inicializador instanceof ASTLiteralArreglo;
@@ -732,7 +878,14 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     TablaSimbolos.TipoDato tipoRetornoAnterior = tipoRetornoFuncionActual;
     tipoRetornoFuncionActual = retornoToken == null ? null : tipoDeToken(retornoToken.kind);
     if (nombreToken != null) entrarScope(nombreToken.image); else entrarScope(); // header roto: sin nombre, hereda el ambito de afuera
+    // Dentro del cuerpo solo se conocen las CONST: los globales pueden haber cambiado en otra funcion.
+    Map<TablaSimbolos.Simbolo, Object> valoresAfuera = valores;
+    valores = new HashMap<TablaSimbolos.Simbolo, Object>();
+    for (Map.Entry<TablaSimbolos.Simbolo, Object> e : valoresAfuera.entrySet()) {
+      if (e.getKey().categoria == TablaSimbolos.Categoria.CONSTANTE) valores.put(e.getKey(), e.getValue());
+    }
     node.childrenAccept(this, data); // declara cada ASTParametro y luego visita el ASTBloque del cuerpo
+    valores = valoresAfuera;
     salirScope();
     if (nombreToken != null) {
       TablaSimbolos.Simbolo funcion = tabla.resolver(nombreToken.image);
@@ -861,6 +1014,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     anotar(node, simbolo.tipo, simbolo);
     if (simbolo.categoria == TablaSimbolos.Categoria.FUNCION) { ManejadorErrores.reportarUsoDeFuncionComoValor(idToken); return null; }
     if (simbolo.categoria == TablaSimbolos.Categoria.CONSTANTE) { ManejadorErrores.reportarAsignacionAConstante(idToken, simbolo.nombre); return null; }
+    valores.remove(simbolo); // el valor leido solo se conoce al ejecutar
     if (simbolo.aridadArreglo > 0) { ManejadorErrores.reportarAridadArregloIncorrecta(idToken, simbolo.nombre, 0, simbolo.aridadArreglo); return null; }
     return null;
   }
@@ -930,10 +1084,17 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     boolean esConstante = simbolo.categoria == TablaSimbolos.Categoria.CONSTANTE;
     if (esConstante) ManejadorErrores.reportarAsignacionAConstante(idToken, simbolo.nombre);
 
+    // Propagacion de constantes: solo escalares (numIndices == 0); una CONST nunca cambia.
+    boolean rastrear = !esConstante && numIndices == 0;
+
     if (indiceOperador < 0) {
       // Termina en ++/--: el elemento/variable debe ser numerico.
       if (aridadOk && !esConstante && simbolo.tipo != TablaSimbolos.TipoDato.ENT && simbolo.tipo != TablaSimbolos.TipoDato.DEC) {
         ManejadorErrores.reportarOperandoNoNumerico(idToken, simbolo.tipo);
+      }
+      if (rastrear) {
+        Object uno = simbolo.tipo == TablaSimbolos.TipoDato.DEC ? (Object) 1.0 : (Object) 1L;
+        fijarValor(simbolo, operar(valores.get(simbolo), siguienteToken.kind == INC ? SUMA : RESTA, uno));
       }
       return null;
     }
@@ -942,6 +1103,13 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     TablaSimbolos.TipoDato tipoValor = (TablaSimbolos.TipoDato) valor.jjtAccept(this, data);
     if (aridadOk && !esConstante && tipoValor != null && tipoValor != simbolo.tipo) {
       reportarValorDeOtroTipo(valor, simbolo.tipo, tipoValor, "'" + simbolo.nombre + "' es " + simbolo.tipo);
+    }
+    if (rastrear) {
+      Object nuevo = valorEstatico(valor);
+      int operadorAsignacion = ((SimpleNode) node.jjtGetChild(indiceOperador)).jjtGetFirstToken().kind;
+      if (operadorAsignacion == ASIG_INC) nuevo = operar(valores.get(simbolo), SUMA, nuevo);
+      else if (operadorAsignacion == ASIG_DEC) nuevo = operar(valores.get(simbolo), RESTA, nuevo);
+      fijarValor(simbolo, nuevo);
     }
     return null;
   }
@@ -967,8 +1135,14 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       exigirBoo((TablaSimbolos.TipoDato) condicion.jjtAccept(this, data), ((SimpleNode) condicion).jjtGetFirstToken());
       i = 1;
     }
+    // Cada rama arranca con los valores de antes del SI; al final solo queda lo que coincide en
+    // todas (sin SINO, la rama "falsa" es no hacer nada, es decir, el estado de antes).
+    Map<TablaSimbolos.Simbolo, Object> antes = new HashMap<TablaSimbolos.Simbolo, Object>(valores);
     if (i < n) node.jjtGetChild(i++).jjtAccept(this, data); // ASTBloque (then)
+    Map<TablaSimbolos.Simbolo, Object> despuesDelThen = valores;
+    valores = antes;
     if (i < n) node.jjtGetChild(i).jjtAccept(this, data); // ASTBloque (sino) o ASTEstructuraSi (sino si)
+    valores = interseccion(despuesDelThen, valores);
     return null;
   }
 
@@ -977,6 +1151,8 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     // falta distinguir "hay condicion" de "el header fallo y solo quedo el ASTBloque".
     int n = node.jjtGetNumChildren();
     if (n == 0) return null;
+    olvidarAsignadasEn(node); // la condicion y el cuerpo se repiten: nada asignado adentro es seguro
+    Map<TablaSimbolos.Simbolo, Object> alEntrar = new HashMap<TablaSimbolos.Simbolo, Object>(valores);
     int i = 0;
     if (!(node.jjtGetChild(0) instanceof ASTBloque)) {
       Node condicion = node.jjtGetChild(0);
@@ -988,6 +1164,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       node.jjtGetChild(i).jjtAccept(this, data);
       profundidadBucle--;
     }
+    valores = interseccion(alEntrar, valores); // puede ejecutarse 0 veces o salir con TERMINAR
     return null;
   }
 
@@ -996,6 +1173,9 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     Node declaracion = partes.declaracion, condicion = partes.condicion, paso = partes.paso, cuerpo = partes.cuerpo;
     entrarScope(); // la variable de control vive en su propio scope, junto con el cuerpo
     if (declaracion != null) declaracion.jjtAccept(this, data);
+    olvidarAsignadasEn(paso); // la variable de control cambia en cada vuelta
+    olvidarAsignadasEn(cuerpo);
+    Map<TablaSimbolos.Simbolo, Object> alEntrar = new HashMap<TablaSimbolos.Simbolo, Object>(valores);
     if (condicion != null) {
       exigirBoo((TablaSimbolos.TipoDato) condicion.jjtAccept(this, data), ((SimpleNode) condicion).jjtGetFirstToken());
     }
@@ -1005,6 +1185,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       cuerpo.jjtAccept(this, data);
       profundidadBucle--;
     }
+    valores = interseccion(alEntrar, valores);
     salirScope();
     return null;
   }
@@ -1015,6 +1196,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (simbolo == null) { ManejadorErrores.reportarVariableNoDeclarada(idToken); return null; }
     simbolo.marcarUsado();
     anotar(node, simbolo.tipo, simbolo);
+    if (simbolo.categoria != TablaSimbolos.Categoria.CONSTANTE) valores.remove(simbolo);
     // El paso modifica su variable: no puede ser una constante, una funcion ni un arreglo completo.
     if (simbolo.categoria == TablaSimbolos.Categoria.CONSTANTE) {
       ManejadorErrores.reportarAsignacionAConstante(idToken, simbolo.nombre);
@@ -1049,6 +1231,10 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     int n = node.jjtGetNumChildren();
     if (n == 0) return null; // header roto por un error sintactico ya reportado
     TablaSimbolos.TipoDato tipoEvaluado = (TablaSimbolos.TipoDato) node.jjtGetChild(0).jjtAccept(this, data);
+    // Se ejecuta uno de los casos (o ninguno) y sin TERMINAR puede seguir al siguiente: nada asignado
+    // en algun caso es seguro, ni dentro de los casos ni despues del EVALUAR.
+    olvidarAsignadasEn(node);
+    Map<TablaSimbolos.Simbolo, Object> alEntrar = new HashMap<TablaSimbolos.Simbolo, Object>(valores);
     entrarScope(); // EVALUAR { ... } es un bloque como cualquier otro aunque no pase por Bloque()
     profundidadCasoEvaluar++;
     Map<String, Token> valoresVistos = new HashMap<String, Token>();
@@ -1071,12 +1257,15 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     }
     profundidadCasoEvaluar--;
     salirScope();
+    valores = interseccion(alEntrar, valores);
     return null;
   }
 
   @Override public Object visit(ASTEstructuraHacer node, Object data) {
     Node[] partes = partesDeHacer(node); // un header roto puede dejar 0, 1 o 2 hijos
     Node cuerpo = partes[0], condicion = partes[1];
+    olvidarAsignadasEn(node); // el cuerpo se repite: nada asignado adentro es seguro
+    Map<TablaSimbolos.Simbolo, Object> alEntrar = new HashMap<TablaSimbolos.Simbolo, Object>(valores);
     if (cuerpo != null) {
       profundidadBucle++;
       cuerpo.jjtAccept(this, data);
@@ -1085,6 +1274,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (condicion != null) {
       exigirBoo((TablaSimbolos.TipoDato) condicion.jjtAccept(this, data), ((SimpleNode) condicion).jjtGetFirstToken());
     }
+    valores = interseccion(alEntrar, valores);
     return null;
   }
 

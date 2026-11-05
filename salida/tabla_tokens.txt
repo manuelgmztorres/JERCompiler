@@ -1,5 +1,5 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: pruebas/prueba_optimizacion.txt
+Archivo: pruebas/prueba_ide.txt
 No.   | Lexema               | Token                        | Línea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | FUN                  | FUN                          | 1      | 1
@@ -8,21 +8,27 @@ No.   | Lexema               | Token                        | Línea  | Columna
 4     | (                    | (                            | 1      | 20
 5     | )                    | )                            | 1      | 21
 6     | {                    | {                            | 1      | 22
-7     | ENT                  | ENT                          | 2      | 5
-8     | suma                 | <IDENTIFICADOR>              | 2      | 9
-9     | ->                   | ->                           | 2      | 14
-10    | 3                    | <NUMERO_ENTERO>              | 2      | 17
-11    | ;                    | ;                            | 2      | 18
-12    | ENT                  | ENT                          | 3      | 5
-13    | i                    | <IDENTIFICADOR>              | 3      | 9
-14    | ->                   | ->                           | 3      | 11
-15    | 4                    | <NUMERO_ENTERO>              | 3      | 14
-16    | ;                    | ;                            | 3      | 15
-17    | ENT                  | ENT                          | 4      | 5
-18    | total                | <IDENTIFICADOR>              | 4      | 9
-19    | ->                   | ->                           | 4      | 15
-20    | suma                 | <IDENTIFICADOR>              | 4      | 18
-21    | +                    | +                            | 4      | 23
-22    | 7                    | <NUMERO_ENTERO>              | 4      | 25
-23    | ;                    | ;                            | 4      | 26
-24    | }                    | }                            | 5      | 1
+7     | IMP                  | IMP                          | 2      | 5
+8     | "Hola Mundo"         | <CADENA>                     | 2      | 9
+9     | ;                    | ;                            | 2      | 21
+10    | ENT                  | ENT                          | 3      | 5
+11    | n1                   | <IDENTIFICADOR>              | 3      | 9
+12    | ->                   | ->                           | 3      | 12
+13    | 15                   | <NUMERO_ENTERO>              | 3      | 15
+14    | ;                    | ;                            | 3      | 17
+15    | ENT                  | ENT                          | 4      | 5
+16    | n2                   | <IDENTIFICADOR>              | 4      | 9
+17    | ->                   | ->                           | 4      | 12
+18    | 0                    | <NUMERO_ENTERO>              | 4      | 15
+19    | ;                    | ;                            | 4      | 16
+20    | ENT                  | ENT                          | 5      | 5
+21    | div                  | <IDENTIFICADOR>              | 5      | 9
+22    | ->                   | ->                           | 5      | 13
+23    | n1                   | <IDENTIFICADOR>              | 5      | 16
+24    | /                    | /                            | 5      | 19
+25    | n2                   | <IDENTIFICADOR>              | 5      | 21
+26    | ;                    | ;                            | 5      | 23
+27    | IMP                  | IMP                          | 6      | 5
+28    | div                  | <IDENTIFICADOR>              | 6      | 9
+29    | ;                    | ;                            | 6      | 12
+30    | }                    | }                            | 7      | 1

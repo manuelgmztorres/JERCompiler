@@ -1,9 +1,10 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: pruebas/prueba_optimizacion.txt
+Archivo: pruebas/prueba_ide.txt
 Nombre               | Categoría  | Tipo   | Dimensiones | Ámbito           | Línea  | Usado | Parámetros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
-principal            | función    | VACIO  | 0           | GLOBAL           | 1      | no    | []
-suma                 | variable   | ENT    | 0           | principal        | 2      | sí    | 
-i                    | variable   | ENT    | 0           | principal        | 3      | no    | 
-total                | variable   | ENT    | 0           | principal        | 4      | no    | 
+n1                   | variable   | ENT    | 0           | GLOBAL           | 1      | sí    | 
+n2                   | variable   | ENT    | 0           | GLOBAL           | 2      | sí    | 
+n3                   | constante  | ENT    | 0           | GLOBAL           | 3      | no    | 
+principal            | función    | VACIO  | 0           | GLOBAL           | 5      | no    | []
+resta                | variable   | ENT    | 0           | principal        | 7      | sí    | 
 --------------------------------------------

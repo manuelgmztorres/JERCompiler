@@ -1,9 +1,7 @@
-ENT n1 -> 0;
-ENT n2 -> 1;
-CONST ENT n3 -> 8;
-
 FUN VACIO principal(){
     IMP "Hola Mundo";
-    ENT resta -> n1 - n2 - n3;
-    IMP resta;
+    ENT n1 -> 15;
+    ENT n2 -> 0;
+    ENT div -> n1 / n2;
+    IMP div;
 }

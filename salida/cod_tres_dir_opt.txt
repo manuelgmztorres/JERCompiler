@@ -1,13 +1,20 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: pruebas/prueba_optimizacion.txt
+Archivo: pruebas/prueba_ide.txt
 
 FUN _inicio
+        LLAMAR _global, 0
         LLAMAR principal, 0
         RET
 
+FUN _global
+        n1 = 0
+        n2 = 1
+        n3 = 8
+        RET
+
 FUN principal
-        suma = 3
-        i = 4
-        total = 10
+        IMP "Hola Mundo"
+        resta = n1 - n2
+        IMP resta
         RET
 --------------------------------------------

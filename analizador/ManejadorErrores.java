@@ -400,6 +400,31 @@ public final class ManejadorErrores implements JERCompilerConstants {
       "Use un índice de raíz mayor que 0.", true));
   }
 
+  /**
+   * '/' o '%' cuyo divisor no es el literal 0 pero vale 0 en ese punto con certeza: una CONST, o una
+   * variable cuyo ultimo valor asignado se conoce al compilar (ver propagacion de constantes en
+   * AnalizadorSemantico). `divisor` es el texto del operando tal como se escribio.
+   */
+  public static void reportarDivisionPorCeroConocida(Token operador, String divisor) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
+      "'" + operador.image + "' con divisor 0: '" + divisor + "' vale 0 en este punto; la división entre cero no está definida.",
+      "Asigne un valor distinto de cero al divisor antes de esta operación.", true));
+  }
+
+  /** '//' cuyo indice no es el literal 0 pero vale 0 en ese punto con certeza (igual que arriba). */
+  public static void reportarRaizDeIndiceCeroConocido(Token operador, String indice) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
+      "'//' con índice 0: '" + indice + "' vale 0 en este punto; la raíz de índice 0 no está definida.",
+      "Asigne un índice de raíz mayor que 0 antes de esta operación.", true));
+  }
+
+  /** '**' entre ENT cuyo exponente no es literal pero vale un negativo conocido en ese punto. */
+  public static void reportarExponenteNegativoConocido(Token operador, String exponente, long valor) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
+      "'" + exponente + "' vale " + valor + " en este punto: un ENT elevado a un exponente negativo no da un entero.",
+      "Use valores DEC o un exponente mayor o igual que 0.", true));
+  }
+
   /** '**' entre enteros con un exponente literal negativo: el resultado no seria entero. */
   public static void reportarExponenteNegativoEnEntero(Token operador) {
     registrar(new ErrorJER("ERROR SEMÁNTICO", operador.beginLine, operador.beginColumn,
