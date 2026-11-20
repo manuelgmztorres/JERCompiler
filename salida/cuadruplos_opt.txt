@@ -1,5 +1,5 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: pruebas\prueba_herramienta.txt
+Archivo: pruebas/prueba_herramienta.txt
 Operador  | Arg1                    | Arg2 | Resultado
 ----------+-------------------------+------+----------
 FUN       | _inicio                 |      |

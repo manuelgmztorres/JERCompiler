@@ -232,9 +232,11 @@ FUN VACIO erroresDeEjecucionEvidentes() {
     # 42. Tamano de arreglo negativo.
     ENT negativo[-2];
 
-    # VALIDOS: lo que depende de valores calculados se decide al ejecutar, no al compilar.
+    # 43. Division entre una variable que vale 0 con certeza (propagacion de constantes).
     ENT cero -> 0;
     ENT h -> 5 / cero;
+
+    # VALIDOS: lo que depende de valores calculados se decide al ejecutar, no al compilar.
     ENT i -> v[cero];
     DEC j -> 2.0 ** -1.0;
 }

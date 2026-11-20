@@ -1,5 +1,5 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: pruebas\prueba_herramienta.txt
+Archivo: pruebas/prueba_herramienta.txt
 Nombre               | Categoría  | Tipo   | Dimensiones | Ámbito           | Línea  | Usado | Parámetros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
 principal            | función    | VACIO  | 0           | GLOBAL           | 1      | no    | []

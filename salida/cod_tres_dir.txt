@@ -1,5 +1,5 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: pruebas\prueba_herramienta.txt
+Archivo: pruebas/prueba_herramienta.txt
 
 FUN _inicio
         LLAMAR principal, 0

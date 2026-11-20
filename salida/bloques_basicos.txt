@@ -1,5 +1,5 @@
 BLOQUES BÁSICOS - JERCompiler
-Archivo: pruebas\prueba_herramienta.txt
+Archivo: pruebas/prueba_herramienta.txt
 Bloques: 5
 
 FUN _inicio
