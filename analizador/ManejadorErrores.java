@@ -125,14 +125,21 @@ public final class ManejadorErrores implements JERCompilerConstants {
     System.out.println(JERCompiler.totalErrores == 0 ? "ANÁLISIS FINALIZADO" : "ANÁLISIS CON ERRORES");
     System.out.println("--------------------------------------------");
     guardarTabla(nombre);
+    borrarTraduccionCpp(); // que no quede un .exe de una compilacion anterior que ya no corresponde
     // Solo con 0 errores: una iteracion con errores puede haber dejado la tabla de simbolos a
     // medio llenar (declaraciones nunca alcanzadas tras un error de sintaxis), y publicarla
     // igual daria una falsa sensacion de "esto es lo que declaraste" cuando no lo es.
     if (JERCompiler.totalErrores == 0 && analizador != null) {
       guardarTablaDeTipos(nombre, analizador.obtenerTabla());
-      if (raiz != null) generarCodigoIntermedio(nombre, raiz, analizador.obtenerTabla());
+      if (raiz != null) {
+        generarCodigoIntermedio(nombre, raiz, analizador.obtenerTabla());
+        generarCodigoObjeto(nombre, raiz, analizador.obtenerTabla());
+      }
     } else if (JERCompiler.totalErrores > 0) {
       // Si hay errores, se sobrescriben los archivos con el encabezado y el mensaje
+      // (.s, .o y .exe ya se borraron arriba: un binario no puede llevar el mensaje).
+      guardarTexto(archivoCpp(".cpp").getPath(), "// TRADUCCIÓN A C++ - JERCompiler\n// Archivo: " + nombre
+          + "\n\n// Código fuente con errores, no se puede generar la traducción a C++.\n", "la traducción a C++");
       File salidaCuadruplos = new File(ARCHIVO_CUADRUPLOS);
       File directorio = salidaCuadruplos.getParentFile(); 
       if (directorio != null && !directorio.exists()) directorio.mkdirs();
@@ -1099,6 +1106,55 @@ public final class ManejadorErrores implements JERCompilerConstants {
     System.out.println(textoOptimizado);
     guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cuadruplos_opt.txt"), textoOptimizado, "los cuádruplos optimizados");
     guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cod_tres_dir_opt.txt"), optimizada.formatearListado(nombreArchivo), "el listado optimizado");
+  }
+
+  private static final String TRADUCCION_CPP = "CodigoTraducido";
+
+  private static File archivoCpp(String extension) {
+    return new File(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", TRADUCCION_CPP + extension));
+  }
+
+  private static void borrarTraduccionCpp() {
+    for (String extension : new String[] { ".cpp", ".s", ".o", ".exe" }) archivoCpp(extension).delete();
+  }
+
+  /**
+   * Con 0 errores: traduce el programa a C++ (salida/CodigoTraducido.cpp) y lo compila con MinGW
+   * en tres pasos: ensamblador (.s), codigo objeto (.o) y enlace al ejecutable (.exe).
+   */
+  private static void generarCodigoObjeto(String nombreArchivo, ASTPrograma raiz, TablaSimbolos simbolos) {
+    GeneradorCpp traductor = new GeneradorCpp(simbolos);
+    String cpp = traductor.generar(raiz, nombreArchivo);
+    File archivo = archivoCpp(".cpp");
+    guardarTexto(archivo.getPath(), cpp, "la traducción a C++");
+    System.out.println("TRADUCCIÓN A C++: " + archivo.getPath());
+    if (!traductor.noSoportado().isEmpty()) {
+      System.out.println("[ADVERTENCIA] La traducción a C++ está incompleta (aún no se traduce " + String.join(", ", traductor.noSoportado()) + "); no se compila con g++.");
+      return;
+    }
+    String cppNombre = TRADUCCION_CPP + ".cpp", s = TRADUCCION_CPP + ".s", o = TRADUCCION_CPP + ".o", exe = TRADUCCION_CPP + ".exe";
+    File carpeta = archivo.getAbsoluteFile().getParentFile();
+    boolean listo = gpp(carpeta, "g++", "-S", cppNombre, "-o", s)
+        && gpp(carpeta, "g++", "-c", cppNombre, "-o", o)
+        && gpp(carpeta, "g++", o, "-o", exe);
+    if (listo) System.out.println("Ejecutable listo. Para correrlo: " + archivoCpp(".exe").getPath());
+  }
+
+  /** Corre un paso de g++ en `carpeta` mostrando el comando y lo que imprima; false si fallo o no hay g++. */
+  private static boolean gpp(File carpeta, String... comando) {
+    System.out.println("> " + String.join(" ", comando));
+    try {
+      Process p = new ProcessBuilder(comando).directory(carpeta).redirectErrorStream(true).start();
+      String mensajes = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      if (!mensajes.isEmpty()) System.out.print(mensajes);
+      if (p.waitFor() == 0) return true;
+      System.out.println("[ADVERTENCIA] g++ no pudo compilar la traducción a C++.");
+    } catch (IOException e) {
+      System.out.println("[ADVERTENCIA] No se encontró g++ (MinGW). Agrega su carpeta bin al PATH; la traducción a C++ sí se guardó.");
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    return false;
   }
 
   private static void guardarTexto(String ruta, String texto, String que) {

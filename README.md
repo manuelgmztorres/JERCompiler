@@ -183,6 +183,7 @@ Valores asumidos para la ejecución, pendientes de confirmar con el equipo: `IMP
 | `prueba_revision3` | 0 | Arreglo global, `REPETIR` y una función con valor. |
 | `prueba_valida` | 0 | Todos los componentes del lenguaje. |
 | `prueba_codigo_intermedio` | 0 | Un grupo por función de todo lo que traduce el generador (expresiones, llamadas, arreglos, control de flujo, `EVALUAR`/`TERMINAR`, `AND`/`OR`). |
+| `prueba_cpp` | 0 | Traducción a C++: concatenación, `AND`/`OR` sin precedencia, `TERMINAR` dentro de `EVALUAR`, nombres reservados de C++. Cada `IMP` indica lo que imprime el `.exe` (el último prueba que un `DEC` se imprime con punto decimal). |
 | `prueba_errores_lexicos` | 4 | Errores léxicos. |
 | `prueba_errores_sintacticos` | 22 | Un mensaje propio por cada tipo de error sintáctico. |
 | `prueba_recuperacion` | 24 | Modo pánico: cada bloque tiene un error real y el código válido que lo rodea no genera ruido. |
@@ -210,7 +211,8 @@ java -cp build JERCompiler pruebas\prueba_valida.txt
 
 Imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `salida\tabla_tokens.txt` (la carpeta `salida\` se crea sola y reúne los resultados de cada compilación; se sobrescriben en cada ejecución). Si el archivo compiló con **0 errores**, además:
 * imprime en consola y guarda en `salida\tabla_tipos.txt` la tabla de símbolos (nombre, categoría, tipo, aridad, línea, parámetros) que armó el analizador semántico — con errores no se publica, porque el análisis pudo haberse cortado a medias (declaraciones nunca alcanzadas) y mostrarla daría una idea equivocada de lo que el programa realmente declara;
-* imprime en consola y guarda en `salida\cuadruplos.txt` la tabla de cuádruplos, y guarda en `salida\cod_tres_dir.txt` el código de tres direcciones (ver "Generación de código intermedio").
+* imprime en consola y guarda en `salida\cuadruplos.txt` la tabla de cuádruplos, y guarda en `salida\cod_tres_dir.txt` el código de tres direcciones (ver "Generación de código intermedio");
+* traduce el programa a C++ en `salida\CodigoTraducido.cpp` (`GeneradorCpp`: C++ estándar con `std::cout`/`std::cin`, solo con los `#include` que el programa usa) y, si `g++` de MinGW está en el `PATH`, lo compila en tres pasos: `g++ -S` (ensamblador `.s`), `g++ -c` (objeto `.o`) y el enlace a `salida\CodigoTraducido.exe`, que se corre a mano. El `.exe` respeta los formatos de "Semántica de ejecución" (`VERDADERO`/`FALSO`, `DEC` con punto decimal), pero no revisa sus errores de ejecución (división entre cero, índice fuera de rango...).
 
 `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirve como referencia rápida de qué reglas semánticas aplica el analizador.
 

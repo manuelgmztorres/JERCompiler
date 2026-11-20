@@ -1,0 +1,8 @@
+FUN VACIO principal(){
+    ENT edad -> 25;
+    SI (edad >= 18){
+        IMP "Eres Mayor de Edad";
+    } SINO {
+        IMP "No Eres Mayor de Edad";
+    }
+}

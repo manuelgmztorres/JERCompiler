@@ -1,6 +1,6 @@
 BLOQUES BÁSICOS - JERCompiler
-Archivo: pruebas/prueba_optimizacion.txt
-Bloques: 2
+Archivo: pruebas\prueba_herramienta.txt
+Bloques: 5
 
 FUN _inicio
   [B1]  -> fin
@@ -8,9 +8,15 @@ FUN _inicio
         RET
 
 FUN principal
-  [B2]  -> fin
-        suma = 3
-        i = 4
-        total = suma + 7
-        RET
+  [B2]  -> B3, B4
+        edad = 25
+        t1 = edad >= 18
+        SALTO_FAL t1, L1
+  [B3]  -> B5
+        IMP "Eres Mayor de Edad"
+        SALTO L2
+  [B4]  -> B5
+  L1:   IMP "No Eres Mayor de Edad"
+  [B5]  -> fin
+  L2:   RET
 --------------------------------------------

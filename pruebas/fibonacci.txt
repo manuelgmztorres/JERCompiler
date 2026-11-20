@@ -1,0 +1,19 @@
+FUN VACIO principal(){
+    IMP "Numero de Iteraciones";
+    ENT iteraciones;
+    OBT iteraciones;
+    ENT actual -> 0;
+    ENT siguiente -> 1;
+
+    IMP "______________________________";
+    IMP actual;
+    IMP siguiente;
+
+    REPETIR(ENT i -> 0; i <= iteraciones; i++){
+        ENT suma -> actual + siguiente;
+        actual -> siguiente;
+        siguiente -> suma;
+
+        IMP siguiente;
+    }
+}

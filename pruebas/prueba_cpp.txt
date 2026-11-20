@@ -1,0 +1,42 @@
+# Prueba de la traduccion a C++ (salida/CodigoTraducido.cpp -> .exe).
+# Cada IMP lleva al lado lo que debe imprimir el ejecutable.
+
+ENT int -> 3;
+CAD texto -> "a";
+
+FUN ENT doble(ENT x) { RET x * 2; }
+
+FUN VACIO principal() {
+  IMP 1 + 2 + "b";                      # 3b
+  IMP "b" + 1 + 2;                      # b12
+  IMP texto + 2.0 + VERDADERO + 'c';    # a2.0VERDADEROc
+  IMP 7 / 2;                            # 3
+  IMP -7 % 3;                           # -1
+  IMP 2 ** 10;                          # 1024
+  IMP 27 // 3;                          # 3
+  IMP 8.0 // 3.0;                       # 2.0
+  IMP - -int;                           # 3
+  IMP (1 + 2) * 3;                      # 9
+  IMP (VERDADERO OR FALSO AND FALSO);    # FALSO (izquierda a derecha)
+  IMP (NOT 1 > 2);                      # VERDADERO
+  IMP ("abc" = "abc");                  # VERDADERO
+  ENT acumulado -> 0;
+  ENT int -> 1;
+  IMP int;                              # 1 (local que oculta al global)
+  ENT i -> 0;
+  MIENTRAS i < 5 {
+    EVALUAR i {
+      CUANDO 1: TERMINAR;
+      PRED: acumulado +-> doble(i);
+    }
+    i++;
+  }
+  IMP acumulado;                        # 18 (0+4+6+8: el TERMINAR solo sale del EVALUAR, no del MIENTRAS)
+  CAD s -> "x";
+  s +-> "5";
+  IMP s;                                # x5
+  ENT v[2] -> [1, 2];
+  IMP v[int];                           # 2 (int es el local, 1)
+  DEC d -> 3.0;
+  IMP d;                                # 3.0
+}

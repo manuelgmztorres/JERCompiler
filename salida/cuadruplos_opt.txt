@@ -1,13 +1,18 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: pruebas/prueba_optimizacion.txt
-Operador | Arg1      | Arg2 | Resultado
----------+-----------+------+----------
-FUN      | _inicio   |      |
-LLAMAR   | principal | 0    |
-RET      |           |      |
-FUN      | principal |      |
-ASIG     | 3         |      | suma
-ASIG     | 4         |      | i
-ASIG     | 10        |      | total
-RET      |           |      |
+Archivo: pruebas\prueba_herramienta.txt
+Operador  | Arg1                    | Arg2 | Resultado
+----------+-------------------------+------+----------
+FUN       | _inicio                 |      |
+LLAMAR    | principal               | 0    |
+RET       |                         |      |
+FUN       | principal               |      |
+ASIG      | 25                      |      | edad
+ASIG      | VERDADERO               |      | t1
+SALTO_FAL | VERDADERO               |      | L1
+IMP       | "Eres Mayor de Edad"    |      |
+SALTO     |                         |      | L2
+ETIQ      |                         |      | L1
+IMP       | "No Eres Mayor de Edad" |      |
+ETIQ      |                         |      | L2
+RET       |                         |      |
 --------------------------------------------

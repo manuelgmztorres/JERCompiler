@@ -1,17 +1,17 @@
-ENT g -> 0;
+ENT g -> 10;
 
-FUN VACIO cambiar() {
-  g -> 7;
-}
-
-FUN VACIO principal() {
-  ENT a -> 0;
-  OBT a;
-  ENT b -> a + 1;
-  cambiar();
-  ENT c -> g * 2;
-  MIENTRAS (a < 3) {
-    a -> a + 1;
-  }
-  IMP b + c;
+FUN VACIO principal(){
+    ENT x -> 1 + 2;
+    ENT a -> 2 + 10 * 2;
+    ENT b -> a * 5;
+    ENT c -> b + 7;
+    ENT d -> 4;
+    ENT e -> c / g;
+    BOO ok -> c > 10;
+    SI (x > 0) {
+        ENT f -> g;
+        IMP f;
+    }
+    ENT g -> a + 1;
+    IMP g;
 }

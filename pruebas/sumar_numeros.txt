@@ -1,0 +1,6 @@
+FUN VACIO principal(){
+    ENT x -> 2;
+    ENT y -> 3;
+    ENT suma -> x + y;
+    IMP suma;
+}
