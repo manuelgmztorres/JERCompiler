@@ -1,6 +1,6 @@
 # JERCompiler
 
-JERCompiler es un compilador desarrollado con JavaCC/JJTree para un lenguaje general en español. Hace el análisis léxico, sintáctico y semántico (tipos, ámbitos y demás reglas sobre el AST) y, cuando el programa no tiene errores, genera el código intermedio: una tabla de cuádruplos y su versión como código de tres direcciones. No genera código objeto.
+JERCompiler es un compilador desarrollado con JavaCC/JJTree para un lenguaje general en español. Hace el análisis léxico, sintáctico y semántico (tipos, ámbitos y demás reglas sobre el AST) y, cuando el programa no tiene errores, genera el código intermedio (una tabla de cuádruplos y su versión como código de tres direcciones) y lo traduce a C++ para obtener el código objeto y el ejecutable con MinGW (`g++`).
 
 > **En desarrollo:** además del compilador, `ide/` tiene un IDE mínimo en Swing para escribir y compilar código JER sin terminal (se abre con `ide\ejecutar.bat`) — ver `ide/README.md`. Sigue en progreso, no es el foco de esta guía.
 
@@ -39,6 +39,9 @@ FUN VACIO principal() {
 * **Control de flujo:** `SI`/`SINO`, `MIENTRAS`, `REPETIR`, `EVALUAR`/`CUANDO`/`PRED`, `TERMINAR`. La condición de `SI`/`MIENTRAS`/`REPETIR`/`HACER...MIENTRAS` también acepta una expresión sola (`SI bandera { ... }`), no solo una comparación explícita.
 * **Funciones y E/S:** `FUN` requiere declarar su tipo de retorno antes del nombre (`ENT`/`DEC`/`CAD`/`CAR`/`BOO`, o `VACIO` si no retorna valor), `RET`, `IMP`, `OBT`.
 * **Variables:** `CONST` sigue requiriendo valor inicial; una variable normal puede declararse sin inicializar (`ENT contador;`).
+* **Conversión de tipos:** `CONV(tipo, dato)` es la única forma de cambiar el tipo de un valor, por ejemplo `DEC promedio -> CONV(DEC, suma) / CONV(DEC, n);`.
+* **Cadenas:** `LONG(s)` da la cantidad de caracteres de una `CAD`; `s[i]` lee o cambia su carácter `i` (un `CAR`, empezando en 0).
+* **Arreglos y funciones:** una función puede recibir un arreglo (`FUN ENT mayor(ENT v[])`, `FUN VACIO llenar(DEC m[][])`) y `LONG(v)` da su tamaño. El arreglo se pasa por referencia: si la función cambia sus elementos, cambia el arreglo original.
 
 ## Análisis semántico
 
@@ -46,11 +49,12 @@ Después de parsear, `AnalizadorSemantico` recorre el AST (vía el visitor `JERC
 
 Reglas que aplica:
 * **Tipos estrictos, sin conversión implícita:** `ENT` y `DEC` nunca se mezclan (ni entre sí ni con ningún otro tipo) en aritmética, comparaciones, asignaciones o retornos — el programador debe declarar el tipo correcto de antemano. La única excepción es `+`, que concatena si cualquiera de los dos lados es `CAD` (el resultado es `CAD`, sea cual sea el otro tipo); `-`, `*`, `/`, `%`, `**`, `//` nunca aceptan `CAD`. Cuando los tipos no coinciden, el mensaje nombra el operando distinto (el tipo de referencia es el de la mayoría de los operandos: en `n1 + n2 + n3` con `n3` `DEC`, señala a `n3`), y si donde va un `DEC` se escribió un entero literal (`CONST DEC n3 -> 2;`, `d + 2`, `mitad(3)`) indica que un valor `DEC` lleva punto decimal (`2.0`).
+* **`CONV(tipo, dato)`:** convierte de forma explícita. Se permite `ENT` a `DEC`; `DEC` a `ENT` (trunca hacia cero: `CONV(ENT, -7.9)` es `-7`); `CAR` a `ENT` (código del carácter) y `ENT` a `CAR`; `CAD` a `ENT` o `DEC` (el texto debe ser un número, se revisa al ejecutar); y `ENT`, `DEC`, `CAR` o `BOO` a `CAD` (el mismo texto que da la concatenación). Cualquier otra combinación, o convertir al mismo tipo, es error.
 * **Condición estrictamente `BOO`:** la condición de `SI`/`MIENTRAS`/`REPETIR`/`HACER...MIENTRAS` (incluida una expresión sola o negada con `NOT`) debe ser de tipo `BOO`; no hay semántica "truthy" para `ENT`/`DEC`.
 * **Ámbitos (scopes):** cada bloque `{ }` (incluidos los de `SI`/`MIENTRAS`/`REPETIR`/`HACER`/`EVALUAR`) abre su propio ámbito anidado dentro de la función que lo contiene. Un parámetro o variable local puede ocultar (*shadowing*) a una variable/constante global del mismo nombre. Funciones y variables/constantes globales comparten un único espacio de nombres (no puede haber una función y una variable global con el mismo nombre).
-* **Arreglos:** las dimensiones de la declaración y los índices de acceso deben ser `ENT`; el número de índices usados debe coincidir exactamente con la aridad declarada (los arreglos se modifican elemento por elemento, no se puede reemplazar uno completo con `->`); los elementos de un literal de arreglo deben ser todos del mismo tipo.
-* **Funciones:** una llamada debe usar el número y tipo de argumentos exactos de la firma; una función `VACIO` no puede usarse como valor dentro de una expresión; `RET` debe coincidir con el tipo de retorno declarado (y una función `VACIO` no puede usar `RET` con valor); toda función con valor debe terminar en `RET` por todos sus caminos.
-* **`TERMINAR`** solo es válido dentro de un bucle (`MIENTRAS`/`REPETIR`/`HACER`) o de un caso de `EVALUAR` (`CUANDO`/`PRED`).
+* **Arreglos:** las dimensiones de la declaración y los índices de acceso deben ser `ENT`; el número de índices usados debe coincidir exactamente con la aridad declarada (los arreglos se modifican elemento por elemento, no se puede reemplazar uno completo con `->`); los elementos de un literal de arreglo deben ser todos del mismo tipo. Una `CAD` acepta un índice (`s[i]`, que es un `CAR`): se puede leer y asignar con `->`, pero no con `+->`, `-->`, `++` ni `--`. Un literal `CAR` solo puede tener un carácter ASCII (sin acentos ni `ñ`; para eso se usa una `CAD`).
+* **Funciones:** una llamada debe usar el número y tipo de argumentos exactos de la firma; una función `VACIO` no puede usarse como valor dentro de una expresión; `RET` debe coincidir con el tipo de retorno declarado (y una función `VACIO` no puede usar `RET` con valor); toda función con valor debe terminar en `RET` por todos sus caminos. Un parámetro arreglo (`ENT v[]`) recibe solo el nombre de un arreglo del mismo tipo y con las mismas dimensiones, nunca un arreglo `CONST` (la función podría modificarlo); una función no puede devolver un arreglo. `LONG` es una función propia del lenguaje: acepta una `CAD` o un arreglo y no se puede declarar otra con ese nombre.
+* **`TERMINAR`** solo es válido dentro de un bucle (`MIENTRAS`/`REPETIR`/`HACER`) o de un caso de `EVALUAR` (`CUANDO`/`PRED`). Sale del bucle más interno, aunque esté dentro de un `EVALUAR` (así un menú con `CUANDO 0: TERMINAR;` termina); solo si el `EVALUAR` no está dentro de ningún bucle, sale del `EVALUAR`.
 * **`CONST` y `OBT`:** no se puede reasignar ni leer (`OBT`) hacia una constante, ni usar un identificador de función como si fuera una variable.
 * **Inicializadores:** un arreglo solo se inicializa con un literal `[...]` y una variable simple nunca con uno; una variable no puede usarse en su propio inicializador (`ENT x -> x;`); y un global no puede usar en su inicializador otro global declarado más abajo, porque los globales se inicializan en el orden en que se declaran. Tampoco puede llamar a una función en su inicializador (`ENT x -> f();` a nivel global es error); si necesita ese valor, asígnelo dentro de `principal`.
 * **Paso de `REPETIR`:** la variable que modifica no puede ser una constante, una función ni un arreglo completo.
@@ -129,6 +133,8 @@ Cómo se arma:
 * **Saltos:** el destino de un salto es una etiqueta (`L1`, `L2`…) que se marca con una fila `ETIQ` justo antes de la fila destino; así la tabla conserva solo las cuatro columnas de un cuádruplo.
 * **Llamadas:** una fila `PARAM` por argumento (todos se evalúan antes) y una fila `LLAMAR` con la función y la cantidad de argumentos.
 * **Arreglos:** una fila `DIM` por dimensión y una `RESERVAR`; los elementos se leen con `LEER_ELEM` y se escriben con `ASIG_ELEM`. En un arreglo de varias dimensiones se aplica un índice por fila: `m[i][j]` es `LEER_ELEM m i t1` y luego `LEER_ELEM t1 j destino`. El `t1` intermedio es una **referencia** a la fila `m[i]`, no una copia, así que `t1[j] = v` (`ASIG_ELEM v j t1`) modifica `m`.
+* **`CONV` y `LONG`** se escriben como una llamada, sin operadores nuevos: `CONV(DEC, suma)` es `PARAM DEC`, `PARAM suma` y `LLAMAR CONV 2 t1` (el primer `PARAM` es el tipo destino); `LONG(s)` es `PARAM s` y `LLAMAR LONG 1 t1`.
+* **Arreglos como argumento:** `PARAM v` y `RECIBIR v`, igual que un escalar; el arreglo se pasa por referencia. Un carácter de una `CAD` se lee con `LEER_ELEM s i t1` y se escribe con `ASIG_ELEM c i s`.
 * **Variables locales con el mismo nombre** en bloques distintos (o que ocultan a un global) se renombran `x`, `x_2`, `x_3` para que no choquen en el listado plano.
 * **Sin optimizaciones** (por ejemplo, sin plegado de constantes), para que el código intermedio refleje el programa fuente. Cada fila guarda en memoria el tipo de su resultado, aunque la tabla impresa no lo muestre.
 
@@ -163,18 +169,19 @@ Todavía no hay una etapa que ejecute el código intermedio. Estas son las decis
 
 * **Punto de entrada:** `FUN VACIO principal()`, sin parámetros, obligatoria. La ejecución empieza en `_inicio` (la primera función de la tabla), que inicializa los globales con `_global` y luego llama a `principal`; el `RET` de `_inicio` termina el programa.
 * **Filas de matrices por referencia:** `LEER_ELEM` sobre una fila de un arreglo de varias dimensiones devuelve una referencia a ella; escribir en esa referencia modifica el arreglo original.
-* **`EVALUAR` sin caída:** solo se ejecuta el caso que coincide y luego se sale del `EVALUAR`. `TERMINAR` dentro de un caso es válido pero redundante.
+* **`EVALUAR` sin caída:** solo se ejecuta el caso que coincide y luego se sale del `EVALUAR`. `TERMINAR` dentro de un caso sale del bucle que rodea al `EVALUAR`; si no hay bucle, es válido pero redundante.
+* **Arreglos como parámetro por referencia:** la función trabaja sobre el arreglo original; los cambios que haga se ven al volver.
 * **Variables sin inicializar:** toman un valor por defecto fijo: `ENT` 0, `DEC` 0.0, `CAD` vacía, `CAR` carácter nulo y `BOO` `FALSO`.
 * **`AND` y `OR` en cortocircuito:** en `a AND b`, si `a` es falso no se evalúa `b`; en `a OR b`, si `a` es verdadero no se evalúa `b`. No hay precedencia entre ellos: se evalúan de izquierda a derecha (`a OR b AND c` es `(a OR b) AND c`).
 * **Orden de inicialización de globales:** el de declaración, antes de ejecutar `principal`.
 * **Tamaño de arreglo:** puede ser cualquier expresión `ENT` (por ejemplo, un valor leído con `OBT`); la reserva de memoria es dinámica.
-* **Errores de ejecución** (asumido, pendiente de confirmar con el equipo): lo que no se pudo ver al compilar detiene el programa con un mensaje `ERROR DE EJECUCIÓN: <causa>`. Son división o módulo entre cero (también con `DEC`), índice negativo o fuera de rango, tamaño de arreglo calculado menor o igual que 0, `**` entre `ENT` con exponente negativo, raíz con índice 0 o de base negativa con índice par, y un valor leído con `OBT` que no corresponde al tipo de la variable (no se reintenta). El desbordamiento de `ENT` queda sin definir.
+* **Errores de ejecución:** lo que no se pudo ver al compilar detiene el programa con un mensaje `ERROR DE EJECUCION: <causa> (linea N)` (sin acentos, para que se lea igual en cualquier consola). Son división o módulo entre cero (también con `DEC`), índice negativo o fuera de rango (también en `s[i]`), tamaño de arreglo calculado menor o igual que 0, `**` entre `ENT` con exponente negativo, raíz con índice 0 o de base negativa con índice par, un valor leído con `OBT` que no corresponde al tipo de la variable (no se reintenta) y un `CONV` de `CAD` a número cuyo texto no es un número. El desbordamiento de `ENT` queda sin definir.
 
 Valores asumidos para la ejecución, pendientes de confirmar con el equipo: `IMP` imprime con salto de línea al final; `BOO` se imprime como `VERDADERO`/`FALSO` y `DEC` siempre con punto decimal (`3.0`); concatenar con `CAD` convierte el otro operando a texto con esos formatos; escapes de cadena y carácter `\n`, `\t`, `\"`, `\'` y `\\`; `OBT` lee según el tipo (`CAD` toma la línea completa, los demás una palabra); la división entera trunca hacia cero y `%` toma el signo del dividendo.
 
 ## Programas de prueba
 
-`pruebas\` tiene 13 programas, sin aserciones automáticas: se ejecutan con el comando de más abajo y se compara la cantidad de errores.
+Estos son los programas principales de `pruebas\`, sin aserciones automáticas: se ejecutan con el comando de más abajo y se compara la cantidad de errores.
 
 | Programa | Errores esperados | Qué cubre |
 |---|---|---|
@@ -184,13 +191,15 @@ Valores asumidos para la ejecución, pendientes de confirmar con el equipo: `IMP
 | `prueba_valida` | 0 | Todos los componentes del lenguaje. |
 | `prueba_codigo_intermedio` | 0 | Un grupo por función de todo lo que traduce el generador (expresiones, llamadas, arreglos, control de flujo, `EVALUAR`/`TERMINAR`, `AND`/`OR`). |
 | `prueba_cpp` | 0 | Traducción a C++: concatenación, `AND`/`OR` sin precedencia, `TERMINAR` dentro de `EVALUAR`, nombres reservados de C++. Cada `IMP` indica lo que imprime el `.exe` (el último prueba que un `DEC` se imprime con punto decimal). |
+| `prueba_ejercicios` | 0 | Ejercicios típicos: arreglos como parámetro (mayor, ordenar, promedio, suma de matriz), cadenas (palíndromo, vocales, invertir, cifrado César), `CONV`, `LONG` y un menú que sale con `TERMINAR`. Indica la entrada y lo que imprime cada `IMP`. |
+| `prueba_ejercicios_errores` | 14 | Un error por caso de `CONV`, `LONG`, arreglos como parámetro y cadenas indexadas. |
 | `prueba_errores_lexicos` | 4 | Errores léxicos. |
 | `prueba_errores_sintacticos` | 22 | Un mensaje propio por cada tipo de error sintáctico. |
 | `prueba_recuperacion` | 24 | Modo pánico: cada bloque tiene un error real y el código válido que lo rodea no genera ruido. |
 | `prueba_estructura` | 13 | Errores por no conocer las reglas propias de JER (comparación, asignación, reservadas). |
 | `prueba_hacer` | 6 | `HACER...MIENTRAS`, válidos y errores. |
 | `prueba_repetir` | 9 | `REPETIR`, válidos y errores. |
-| `prueba_semantica_invalida` | 45 | Errores semánticos, uno por bloque, incluidos los errores de ejecución evidentes. |
+| `prueba_semantica_invalida` | 46 | Errores semánticos, uno por bloque, incluidos los errores de ejecución evidentes. |
 | `prueba_decisiones_previas` | 8 | Un error por cada decisión semántica (globales, inicializadores, `principal`...). |
 
 ---
@@ -212,7 +221,7 @@ java -cp build JERCompiler pruebas\prueba_valida.txt
 Imprime los errores léxicos/sintácticos/semánticos encontrados (si los hay) y actualiza `salida\tabla_tokens.txt` (la carpeta `salida\` se crea sola y reúne los resultados de cada compilación; se sobrescriben en cada ejecución). Si el archivo compiló con **0 errores**, además:
 * imprime en consola y guarda en `salida\tabla_tipos.txt` la tabla de símbolos (nombre, categoría, tipo, aridad, línea, parámetros) que armó el analizador semántico — con errores no se publica, porque el análisis pudo haberse cortado a medias (declaraciones nunca alcanzadas) y mostrarla daría una idea equivocada de lo que el programa realmente declara;
 * imprime en consola y guarda en `salida\cuadruplos.txt` la tabla de cuádruplos, y guarda en `salida\cod_tres_dir.txt` el código de tres direcciones (ver "Generación de código intermedio");
-* traduce el programa a C++ en `salida\CodigoTraducido.cpp` (`GeneradorCpp`: C++ estándar con `std::cout`/`std::cin`, solo con los `#include` que el programa usa) y, si `g++` de MinGW está en el `PATH`, lo compila en tres pasos: `g++ -S` (ensamblador `.s`), `g++ -c` (objeto `.o`) y el enlace a `salida\CodigoTraducido.exe`, que se corre a mano. El `.exe` respeta los formatos de "Semántica de ejecución" (`VERDADERO`/`FALSO`, `DEC` con punto decimal), pero no revisa sus errores de ejecución (división entre cero, índice fuera de rango...).
+* traduce el programa a C++ en `salida\CodigoTraducido.cpp` (`GeneradorCpp`: C++ estándar con `std::cout`/`std::cin`, solo con los `#include` que el programa usa) y, si `g++` de MinGW está en el `PATH`, lo compila en tres pasos: `g++ -S` (ensamblador `.s`), `g++ -c` (objeto `.o`) y el enlace `g++ -static` a `salida\CodigoTraducido.exe` (estático, para que corra aunque las DLL de MinGW no estén en el `PATH`), que se corre a mano. El `.exe` respeta los formatos de "Semántica de ejecución" (`VERDADERO`/`FALSO`, `DEC` con punto decimal y hasta 15 cifras) y detiene el programa con `ERROR DE EJECUCION` en los errores de ejecución. Lo que declara el programa va dentro de `namespace jer`, para que nombres como `abs` o `log` no choquen con la biblioteca de C; si el programa imprime acentos o `ñ`, el `.exe` pone la consola de Windows en UTF-8.
 
 `pruebas\prueba_semantica_invalida.txt` (errores documentados, uno por bloque) sirve como referencia rápida de qué reglas semánticas aplica el analizador.
 

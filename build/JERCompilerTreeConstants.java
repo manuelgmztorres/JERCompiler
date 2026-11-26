@@ -32,7 +32,8 @@ public interface JERCompilerTreeConstants
   public int JJTUNARYMINUS = 28;
   public int JJTLITERALARREGLO = 29;
   public int JJTVALORSIMPLE = 30;
-  public int JJTLLAMADAFUNCION = 31;
+  public int JJTCONVERSION = 31;
+  public int JJTLLAMADAFUNCION = 32;
 
 
   public String[] jjtNodeName = {
@@ -67,7 +68,8 @@ public interface JERCompilerTreeConstants
     "UnaryMinus",
     "LiteralArreglo",
     "ValorSimple",
+    "Conversion",
     "LlamadaFuncion",
   };
 }
-/* JavaCC - OriginalChecksum=4a10f019e37f14df1513c33689d0f9d1 (do not edit this line) */
+/* JavaCC - OriginalChecksum=2fd7c9d0fa7373f74319fa6016942c76 (do not edit this line) */

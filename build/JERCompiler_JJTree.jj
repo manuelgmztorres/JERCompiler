@@ -317,7 +317,7 @@ TOKEN : {
 TOKEN : {
     < SI: "SI" > | < SINO: "SINO" > | < MIENTRAS: "MIENTRAS" > | < REPETIR: "REPETIR" > | < HACER: "HACER" >
   | < EVALUAR: "EVALUAR" > | < CUANDO: "CUANDO" > | < PRED: "PRED" > | < TERMINAR: "TERMINAR" >
-  | < FUN: "FUN" > | < RET: "RET" > | < OBT: "OBT" > | < IMP: "IMP" >
+  | < FUN: "FUN" > | < RET: "RET" > | < OBT: "OBT" > | < IMP: "IMP" > | < CONV: "CONV" >
 }
 TOKEN : { < VERDADERO: "VERDADERO" > | < FALSO: "FALSO" > }
 TOKEN : {
@@ -651,7 +651,7 @@ void Parametro()            : {/*@bgen(jjtree) Parametro */
   try {
 /*@egen*/
   try {
-    tipo=TipoDato() id=<IDENTIFICADOR>
+    tipo=TipoDato() id=<IDENTIFICADOR> ( <APERTURA_CORCHETE> <CIERRE_CORCHETE> )*
   } catch (ParseException e) {
     reportarError(e);
     recuperarHasta(SEPARADOR, CIERRE_PAREN, EOF);
@@ -1456,7 +1456,7 @@ void Factor()             : {/*@bgen(jjtree) #Factor(> 1) */
 // aritmetica agrupada ("(a + b) * 2") como una condicion agrupada ("(a > b) AND c"), sin
 // ambiguedad, porque es un superconjunto estricto.
 void Base() : {}
-{ UnaryMinus() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Condicion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
+{ UnaryMinus() | Conversion() | LOOKAHEAD(<IDENTIFICADOR> <APERTURA_PAREN>) LlamadaFuncion() | <APERTURA_PAREN> Condicion() <CIERRE_PAREN> | LiteralArreglo() | ValorSimple() }
 
 // Separado de Base() para que el '-' unario si quede marcado en el arbol (nodo propio),
 // sin afectar las demas alternativas de Base(), que siguen delegando de forma transparente.
@@ -1559,6 +1559,39 @@ void ValorSimple()              : {/*@bgen(jjtree) ValorSimple */
   }
 /*@egen*/ }
 
+// CONV(tipo, dato): conversion explicita entre tipos. El tipo destino es el token que sigue al
+// '(' (TipoDato no crea nodo), asi que el unico hijo es el dato que se convierte.
+void Conversion()             : {/*@bgen(jjtree) Conversion */
+  ASTConversion jjtn000 = new ASTConversion(JJTCONVERSION);
+  boolean jjtc000 = true;
+  jjtree.openNodeScope(jjtn000);
+  jjtn000.jjtSetFirstToken(getToken(1));
+/*@egen*/}
+{/*@bgen(jjtree) Conversion */
+  try {
+/*@egen*/ <CONV> <APERTURA_PAREN> TipoDato() <SEPARADOR> Condicion() <CIERRE_PAREN>/*@bgen(jjtree)*/
+  } catch (Throwable jjte000) {
+    if (jjtc000) {
+      jjtree.clearNodeScope(jjtn000);
+      jjtc000 = false;
+    } else {
+      jjtree.popNode();
+    }
+    if (jjte000 instanceof RuntimeException) {
+      throw (RuntimeException)jjte000;
+    }
+    if (jjte000 instanceof ParseException) {
+      throw (ParseException)jjte000;
+    }
+    throw (Error)jjte000;
+  } finally {
+    if (jjtc000) {
+      jjtree.closeNodeScope(jjtn000, true);
+      jjtn000.jjtSetLastToken(getToken(0));
+    }
+  }
+/*@egen*/ }
+
 void LlamadaFuncion()                 : {/*@bgen(jjtree) LlamadaFuncion */
   ASTLlamadaFuncion jjtn000 = new ASTLlamadaFuncion(JJTLLAMADAFUNCION);
   boolean jjtc000 = true;
@@ -1598,7 +1631,7 @@ Token TokenCualquiera() : { Token t; }
   (
       t=<TIPO_ENT> | t=<TIPO_DEC> | t=<TIPO_CAD> | t=<TIPO_CAR> | t=<TIPO_BOO> | t=<TIPO_VACIO> | t=<CONST>
     | t=<SI> | t=<SINO> | t=<MIENTRAS> | t=<REPETIR> | t=<HACER> | t=<EVALUAR> | t=<CUANDO> | t=<PRED>
-    | t=<TERMINAR> | t=<FUN> | t=<RET> | t=<OBT> | t=<IMP> | t=<VERDADERO> | t=<FALSO>
+    | t=<TERMINAR> | t=<FUN> | t=<RET> | t=<OBT> | t=<IMP> | t=<CONV> | t=<VERDADERO> | t=<FALSO>
     | t=<NUMERO_DECIMAL> | t=<NUMERO_ENTERO> | t=<CADENA> | t=<CARACTER>
     | t=<STRING_NO_CERRADA> | t=<CARACTER_INVALIDO> | t=<ERROR_LEXICO>
     | t=<ASIG_INC> | t=<ASIG_DEC> | t=<ASIGNACION> | t=<POTENCIA> | t=<RAIZ> | t=<INC> | t=<DEC_OP>

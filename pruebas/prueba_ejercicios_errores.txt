@@ -1,0 +1,47 @@
+# Errores semanticos de CONV, LONG, arreglos como parametro y cadenas indexadas. Un error por caso: 14.
+
+CONST ENT FIJO[3] -> [1, 2, 3];
+
+FUN ENT sumar(ENT v[]) { RET v[0]; }
+FUN ENT total(ENT m[][]) { RET m[0][0]; }
+
+FUN VACIO principal() {
+    ENT n -> 4;
+    DEC d -> 2.5;
+    CAD s -> "hola";
+    CAR c -> 'a';
+    ENT v[3] -> [1, 2, 3];
+    DEC w[3] -> [1.0, 2.0, 3.0];
+
+    # 1. CONV al mismo tipo
+    ENT a -> CONV(ENT, n);
+    # 2. BOO no se convierte a ENT
+    ENT b -> CONV(ENT, VERDADERO);
+    # 3. DEC no se convierte a CAR
+    CAR e -> CONV(CAR, d);
+    # 4. Sigue sin haber conversion automatica: un ENT no se asigna a un DEC
+    DEC f -> n;
+    # 5. LONG de un ENT
+    ENT g -> LONG(n);
+    # 6. LONG con dos argumentos
+    ENT h -> LONG(s, s);
+    # 7. Un escalar donde va un arreglo
+    IMP sumar(n);
+    # 8. Un arreglo de otro tipo
+    IMP sumar(w);
+    # 9. Un arreglo de otras dimensiones
+    IMP total(v);
+    # 10. Un arreglo CONST no se pasa a una funcion
+    IMP sumar(FIJO);
+    # 11. Un caracter de una CAD es CAR, no CAD
+    s[0] -> "x";
+    # 12. s[i] +-> no aplica a un CAR
+    s[0] +-> 'x';
+    # 13. Una CAD tiene una sola dimension
+    IMP s[0][1];
+    # 14. Un CAR con acento o ñ no cabe en un CAR
+    CAR enie -> 'ñ';
+}
+
+# Tambien es error declarar una funcion con el nombre de una predefinida, pero se deja fuera
+# para que el conteo sea uno por caso dentro de principal.

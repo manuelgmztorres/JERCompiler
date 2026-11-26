@@ -33,6 +33,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
 
   final TablaCuadruplos tabla = new TablaCuadruplos();
   private final Deque<List<Integer>> salidas = new ArrayDeque<List<Integer>>(); // salidas de los bloques abiertos (bucles y EVALUAR)
+  private final Deque<List<Integer>> salidasDeBucle = new ArrayDeque<List<Integer>>(); // solo las de los bucles abiertos
 
   // Nombres de simbolos del ambito global (variables, constantes y funciones): un local que se
   // llame igual no puede conservar el nombre, o la tabla seria ambigua.
@@ -293,6 +294,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     if (nodo instanceof ASTExpresionRelacional) return relacional((ASTExpresionRelacional) nodo, destino);
     if (nodo instanceof ASTLlamadaFuncion) return llamar((SimpleNode) nodo, destino, true);
     if (nodo instanceof ASTExpresionLogica) return logica((ASTExpresionLogica) nodo, destino);
+    if (nodo instanceof ASTConversion) return convertir((ASTConversion) nodo, destino);
     noSoportado(nodo.getClass().getSimpleName());
     return "?";
   }
@@ -357,12 +359,33 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     int n = nodo.jjtGetNumChildren();
     String[] argumentos = new String[n];
     for (int i = 0; i < n; i++) argumentos[i] = expresion(nodo.jjtGetChild(i), null);
-    for (int i = 0; i < n; i++) tabla.emitir("PARAM", argumentos[i], null, null, funcion.tiposParametros.get(i));
+    for (int i = 0; i < n; i++) {
+      // LONG acepta CAD o un arreglo de cualquier tipo: el PARAM lleva el tipo del argumento real.
+      TablaSimbolos.TipoDato tipo = funcion.predefinida ? tipoDe(nodo.jjtGetChild(i)) : funcion.tiposParametros.get(i);
+      tabla.emitir("PARAM", argumentos[i], null, null, tipo);
+    }
     String resultado = null;
     if (conValor && funcion.tipo != TablaSimbolos.TipoDato.VACIO) resultado = destino != null ? destino : temporal();
     tabla.emitir("LLAMAR", funcion.nombre, String.valueOf(n), resultado, funcion.tipo);
     return resultado;
   }
+
+  /**
+   * `CONV(DEC, x)` se escribe como una llamada, con los argumentos en el orden del fuente: `PARAM DEC`,
+   * `PARAM x` y `LLAMAR CONV 2 destino`. El primer PARAM es el nombre del tipo destino.
+   */
+  private String convertir(ASTConversion nodo, String destino) {
+    TablaSimbolos.TipoDato tipo = tipoDe(nodo);
+    String dato = expresion(nodo.jjtGetChild(0), null);
+    tabla.emitir("PARAM", tipo.name(), null, null, null);
+    tabla.emitir("PARAM", dato, null, null, tipoDe(nodo.jjtGetChild(0)));
+    String resultado = destino != null ? destino : temporal();
+    tabla.emitir("LLAMAR", FUNCION_CONVERSION, "2", resultado, tipo);
+    return resultado;
+  }
+
+  /** Nombre con el que CONV aparece en las filas LLAMAR. */
+  static final String FUNCION_CONVERSION = "CONV";
 
   // Arreglos
 
@@ -404,7 +427,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     String[] indices = evaluarIndices(nodo, nodo.jjtGetNumChildren());
     String fila = descender(nombre(arreglo), indices, arreglo.tipo);
     String resultado = destino != null ? destino : temporal();
-    tabla.emitir("LEER_ELEM", fila, indices[indices.length - 1], resultado, arreglo.tipo);
+    tabla.emitir("LEER_ELEM", fila, indices[indices.length - 1], resultado, tipoDe(nodo)); // CAR si es `s[i]` de una CAD
     return resultado;
   }
 
@@ -417,7 +440,8 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     int numIndices = posicionOperador >= 0 ? posicionOperador : nodo.jjtGetNumChildren();
     String[] indices = evaluarIndices(nodo, numIndices);
     String ultimo = indices[numIndices - 1];
-    TablaSimbolos.TipoDato tipo = arreglo.tipo;
+    // `s[i] -> c` escribe un caracter de una CAD: el elemento es CAR.
+    TablaSimbolos.TipoDato tipo = AnalizadorSemantico.esIndiceDeCadena(arreglo, numIndices) ? TablaSimbolos.TipoDato.CAR : arreglo.tipo;
 
     int operador = operadorDeElemento(nodo, posicionOperador);
     String valor = posicionOperador >= 0 ? expresion(nodo.jjtGetChild(posicionOperador + 1), null) : unoDe(tipo);
@@ -579,9 +603,11 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     int inicio = tabla.siguiente();
     List<Integer> lista = new ArrayList<Integer>();
     salidas.push(lista);
+    salidasDeBucle.push(lista);
     sentencia(partes[0]);
     String valor = expresion(partes[1], null);
     tabla.emitir("SALTO_VER", valor, null, String.valueOf(inicio), null);
+    salidasDeBucle.pop();
     tabla.rellenar(salidas.pop(), tabla.siguiente());
   }
 
@@ -600,9 +626,11 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     List<Integer> lista = new ArrayList<Integer>();
     lista.add(saltoSiFalso(condicion));
     salidas.push(lista);
+    salidasDeBucle.push(lista);
     sentencia(cuerpo);
     if (paso != null) paso((ASTPasoRepetir) paso);
     tabla.emitir("SALTO", null, null, String.valueOf(inicio), null);
+    salidasDeBucle.pop();
     tabla.rellenar(salidas.pop(), tabla.siguiente());
   }
 
@@ -617,7 +645,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     String valor = expresion(nodo.jjtGetChild(0), null);
     List<Integer> haciaCuerpo = compararCasos(casos, valor);
 
-    List<Integer> lista = new ArrayList<Integer>(); // salidas: los SALTO al final y cada TERMINAR
+    List<Integer> lista = new ArrayList<Integer>(); // salidas: los SALTO al final y cada TERMINAR que no tenga un bucle alrededor
     salidas.push(lista);
     boolean hayPred = casos.get(casos.size() - 1).esPred;
     int haciaPred = tabla.emitir("SALTO", null, null, null, null); // si ningun CUANDO coincide
@@ -655,10 +683,15 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     }
   }
 
-  /** `TERMINAR`: salto al final del bucle o EVALUAR mas interno, que se rellena cuando ese bloque termina. */
+  /**
+   * `TERMINAR`: salto al final del bucle mas interno, aunque este dentro de un caso de EVALUAR (asi un
+   * menu `CUANDO 0: TERMINAR;` sale del bucle). Solo si no hay ningun bucle abierto sale del EVALUAR.
+   * El destino se rellena cuando ese bloque termina.
+   */
   void terminar() {
     if (salidas.isEmpty()) { noSoportado("TERMINAR fuera de un bucle (error interno del generador)"); return; }
-    salidas.peek().add(tabla.emitir("SALTO", null, null, null, null));
+    List<Integer> destino = salidasDeBucle.isEmpty() ? salidas.peek() : salidasDeBucle.peek();
+    destino.add(tabla.emitir("SALTO", null, null, null, null));
   }
 
   /** Calcula la condicion y emite `SALTO_FAL c` con el destino pendiente; devuelve el numero de esa fila. */

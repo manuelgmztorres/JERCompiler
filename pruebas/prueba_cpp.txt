@@ -31,7 +31,7 @@ FUN VACIO principal() {
     }
     i++;
   }
-  IMP acumulado;                        # 18 (0+4+6+8: el TERMINAR solo sale del EVALUAR, no del MIENTRAS)
+  IMP acumulado;                        # 0 (con i = 1 el TERMINAR sale del MIENTRAS, no solo del EVALUAR)
   CAD s -> "x";
   s +-> "5";
   IMP s;                                # x5

@@ -299,6 +299,17 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       }
       return acumulado;
     }
+    if (nodo instanceof ASTConversion && nodo.jjtGetNumChildren() == 1) {
+      Anotacion a = Anotacion.de(nodo);
+      Object v = valorEstatico(nodo.jjtGetChild(0));
+      if (a == null || v == null) return null;
+      if (a.tipo == TablaSimbolos.TipoDato.DEC && v instanceof Long) return ((Long) v).doubleValue();
+      if (a.tipo == TablaSimbolos.TipoDato.ENT && v instanceof Double) {
+        double d = (Double) v;
+        return Math.abs(d) < 9.0e18 ? (Object) (long) d : null; // (long) trunca hacia cero
+      }
+      return null;
+    }
     return null; // llamadas, arreglos, comparaciones, CAD/CAR/BOO
   }
 
@@ -394,6 +405,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   /** true si el token `a` queda despues del token `b` en el archivo. */
   private static boolean despuesDe(Token a, Token b) {
     return a.beginLine > b.beginLine || (a.beginLine == b.beginLine && a.beginColumn > b.beginColumn);
+  }
+
+  /** true si `accesos` indices sobre `simbolo` son `s[i]`: un caracter de una CAD (que no es arreglo). */
+  static boolean esIndiceDeCadena(TablaSimbolos.Simbolo simbolo, int accesos) {
+    return accesos == 1 && simbolo.aridadArreglo == 0 && simbolo.tipo == TablaSimbolos.TipoDato.CAD;
   }
 
   // Utilidades de tokens y tipos
@@ -778,6 +794,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       return null;
     }
     anotar(nodo, simbolo.tipo, simbolo); // la funcion llamada y su tipo de retorno
+    if (simbolo.predefinida) return validarPredefinida(idToken, nodo, simbolo, data);
     int numArgs = nodo.jjtGetNumChildren();
     int numParams = simbolo.tiposParametros.size();
     boolean huboError = numArgs != numParams;
@@ -785,6 +802,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     int limite = Math.min(numArgs, numParams);
     for (int i = 0; i < limite; i++) {
       Node argumento = nodo.jjtGetChild(i);
+      int aridadEsperada = simbolo.aridadesParametros == null ? 0 : simbolo.aridadesParametros.get(i);
+      if (aridadEsperada > 0) {
+        if (!validarArgumentoArreglo(argumento, simbolo, i, data)) huboError = true;
+        continue;
+      }
       TablaSimbolos.TipoDato tipoArgumento = (TablaSimbolos.TipoDato) argumento.jjtAccept(this, data);
       TablaSimbolos.TipoDato tipoEsperado = simbolo.tiposParametros.get(i);
       if (tipoArgumento != null && tipoArgumento != tipoEsperado) {
@@ -796,7 +818,98 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     return huboError ? null : simbolo.tipo;
   }
 
+  /** "un arreglo ENT[]" / "un ENT": como se nombra lo que espera o recibe un parametro en los mensajes. */
+  private static String descripcionArgumento(TablaSimbolos.TipoDato tipo, int aridad) {
+    return aridad > 0 ? "un arreglo " + tipo + "[]".repeat(aridad) : "un " + tipo;
+  }
+
+  /**
+   * El argumento de un parametro arreglo debe ser solo el nombre de un arreglo del mismo tipo y con las
+   * mismas dimensiones; la funcion recibe el arreglo original (por referencia), no una copia. No pasa
+   * por visit(ASTValorSimple), que exige todos los indices. Devuelve false si hubo error.
+   */
+  private boolean validarArgumentoArreglo(Node argumento, TablaSimbolos.Simbolo funcion, int i, Object data) {
+    TablaSimbolos.TipoDato tipoEsperado = funcion.tiposParametros.get(i);
+    int aridadEsperada = funcion.aridadesParametros.get(i);
+    String esperado = descripcionArgumento(tipoEsperado, aridadEsperada);
+    Token donde = ((SimpleNode) argumento).jjtGetFirstToken();
+    if (!esNombreSimple(argumento)) {
+      TablaSimbolos.TipoDato tipo = (TablaSimbolos.TipoDato) argumento.jjtAccept(this, data);
+      if (tipo != null) ManejadorErrores.reportarArgumentoArregloIncorrecto(donde, funcion.nombre, i + 1, esperado, "un valor " + tipo);
+      return false;
+    }
+    TablaSimbolos.Simbolo arreglo = tabla.resolver(donde.image);
+    if (arreglo == null) { ManejadorErrores.reportarVariableNoDeclarada(donde); return false; }
+    arreglo.marcarUsado();
+    if (arreglo.categoria == TablaSimbolos.Categoria.FUNCION) { ManejadorErrores.reportarUsoDeFuncionComoValor(donde); return false; }
+    if (arreglo.tipo != tipoEsperado || arreglo.aridadArreglo != aridadEsperada) {
+      ManejadorErrores.reportarArgumentoArregloIncorrecto(donde, funcion.nombre, i + 1, esperado,
+          "'" + arreglo.nombre + "', que es " + descripcionArgumento(arreglo.tipo, arreglo.aridadArreglo));
+      return false;
+    }
+    if (arreglo.categoria == TablaSimbolos.Categoria.CONSTANTE) { ManejadorErrores.reportarArregloConstanteComoArgumento(donde, arreglo.nombre); return false; }
+    anotar((SimpleNode) argumento, arreglo.tipo, arreglo);
+    return true;
+  }
+
+  /**
+   * LONG(x): un solo argumento, una CAD (cantidad de caracteres) o el nombre de un arreglo de
+   * cualquier tipo (tamano de su primera dimension). Devuelve ENT, o null si hubo error.
+   */
+  private TablaSimbolos.TipoDato validarPredefinida(Token idToken, SimpleNode nodo, TablaSimbolos.Simbolo funcion, Object data) {
+    int numArgs = nodo.jjtGetNumChildren();
+    if (numArgs != 1) {
+      ManejadorErrores.reportarNumeroArgumentosIncorrecto(idToken, funcion.nombre, numArgs, 1);
+      nodo.childrenAccept(this, data);
+      return null;
+    }
+    Node argumento = nodo.jjtGetChild(0);
+    if (esNombreSimple(argumento)) {
+      TablaSimbolos.Simbolo arreglo = tabla.resolver(((SimpleNode) argumento).jjtGetFirstToken().image);
+      if (arreglo != null && arreglo.categoria != TablaSimbolos.Categoria.FUNCION && arreglo.aridadArreglo > 0) {
+        arreglo.marcarUsado();
+        anotar((SimpleNode) argumento, arreglo.tipo, arreglo);
+        return funcion.tipo;
+      }
+    }
+    TablaSimbolos.TipoDato tipo = (TablaSimbolos.TipoDato) argumento.jjtAccept(this, data);
+    if (tipo == null) return null;
+    if (tipo != TablaSimbolos.TipoDato.CAD) {
+      ManejadorErrores.reportarArgumentoPredefinidaInvalido(((SimpleNode) argumento).jjtGetFirstToken(), funcion.nombre, "una cadena (CAD) o un arreglo");
+      return null;
+    }
+    return funcion.tipo;
+  }
+
   // Pasada 1: registro global
+
+  /** Nombre de la funcion predefinida que da la longitud de una CAD o el tamano de un arreglo. */
+  static final String FUNCION_LONG = "LONG";
+
+  /**
+   * Funciones que trae el lenguaje, registradas en el scope global antes que las del programa, asi
+   * que un programa que declare otra igual recibe el error de nombre duplicado. LONG(x) acepta una
+   * CAD o un arreglo de cualquier tipo (se valida aparte, en validarPredefinida) y devuelve ENT.
+   */
+  private void registrarPredefinidas() {
+    Token declaracion = new Token(IDENTIFICADOR, FUNCION_LONG);
+    TablaSimbolos.Simbolo longitud = new TablaSimbolos.Simbolo(FUNCION_LONG, TablaSimbolos.Categoria.FUNCION,
+        TablaSimbolos.TipoDato.ENT, 0, Arrays.asList(TablaSimbolos.TipoDato.CAD), declaracion, null, tabla.ambitoActual());
+    longitud.aridadesParametros = Arrays.asList(0);
+    longitud.predefinida = true;
+    tabla.declarar(longitud);
+  }
+
+  /** Cuantos pares `[]` siguen al nombre de un parametro: 0 escalar, 1 en `ENT v[]`, 2 en `ENT m[][]`. */
+  static int aridadDeParametro(Node parametro) {
+    Token t = ((SimpleNode) parametro).jjtGetFirstToken(), ultimo = ((SimpleNode) parametro).jjtGetLastToken();
+    int aridad = 0;
+    for (; t != null; t = t.next) {
+      if (t.kind == APERTURA_CORCHETE) aridad++;
+      if (t == ultimo) break;
+    }
+    return aridad;
+  }
 
   private void registrarDeclaracionesGlobales(ASTPrograma raiz) {
     for (int i = 0; i < raiz.jjtGetNumChildren(); i++) {
@@ -818,6 +931,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     TablaSimbolos.TipoDato tipoRetorno = tipoDeToken(retornoToken.kind);
     if (tipoRetorno == null) return;
     List<TablaSimbolos.TipoDato> tiposParametros = new ArrayList<TablaSimbolos.TipoDato>();
+    List<Integer> aridadesParametros = new ArrayList<Integer>();
     for (int i = 0; i < nodo.jjtGetNumChildren(); i++) {
       Node hijo = nodo.jjtGetChild(i);
       if (!(hijo instanceof ASTParametro)) break; // los ASTParametro siempre preceden al ASTBloque del cuerpo
@@ -825,9 +939,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       TablaSimbolos.TipoDato tipo = tipoDeToken(tipoParametro.kind);
       if (tipo == null) return; // parametro roto por un error sintactico ya reportado
       tiposParametros.add(tipo);
+      aridadesParametros.add(aridadDeParametro(hijo));
     }
     TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(nombreToken.image, TablaSimbolos.Categoria.FUNCION,
         tipoRetorno, 0, tiposParametros, nombreToken, null, tabla.ambitoActual());
+    simbolo.aridadesParametros = aridadesParametros;
     TablaSimbolos.Simbolo previo = tabla.declarar(simbolo);
     if (previo != null) ManejadorErrores.reportarSimboloDuplicado(nombreToken, TablaSimbolos.Categoria.FUNCION, previo);
   }
@@ -839,6 +955,7 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
   }
 
   @Override public Object visit(ASTPrograma node, Object data) {
+    registrarPredefinidas();
     registrarDeclaracionesGlobales(node);
     return node.childrenAccept(this, data); // ahora si baja a cada ASTDeclaracionFuncion (y a los inicializadores globales)
   }
@@ -987,7 +1104,11 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (idToken == null) return null; // roto por un error sintactico ya reportado
     TablaSimbolos.TipoDato tipo = tipoDeToken(tipoToken.kind);
     if (tipo == null) return null;
-    TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(idToken.image, TablaSimbolos.Categoria.PARAMETRO, tipo, 0, null, idToken, null, tabla.ambitoActual());
+    // Un parametro arreglo (`ENT v[]`) no conoce el tamano de sus dimensiones: depende del argumento.
+    int aridad = aridadDeParametro(node);
+    int[] tamanios = null;
+    if (aridad > 0) { tamanios = new int[aridad]; Arrays.fill(tamanios, -1); }
+    TablaSimbolos.Simbolo simbolo = new TablaSimbolos.Simbolo(idToken.image, TablaSimbolos.Categoria.PARAMETRO, tipo, aridad, null, idToken, tamanios, tabla.ambitoActual());
     TablaSimbolos.Simbolo previo = tabla.declarar(simbolo);
     if (previo != null) ManejadorErrores.reportarSimboloDuplicado(idToken, TablaSimbolos.Categoria.PARAMETRO, previo);
     else anotar(node, tipo, simbolo);
@@ -1078,7 +1199,10 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       }
       validarIndiceLiteral(simbolo, i, indice);
     }
-    boolean aridadOk = numIndices == simbolo.aridadArreglo;
+    // `s[i] -> 'x'` escribe un caracter de una CAD: el destino es un CAR.
+    boolean indiceDeCadena = esIndiceDeCadena(simbolo, numIndices);
+    TablaSimbolos.TipoDato tipoDestino = indiceDeCadena ? TablaSimbolos.TipoDato.CAR : simbolo.tipo;
+    boolean aridadOk = indiceDeCadena || numIndices == simbolo.aridadArreglo;
     if (!aridadOk) ManejadorErrores.reportarAridadArregloIncorrecta(idToken, simbolo.nombre, numIndices, simbolo.aridadArreglo);
 
     boolean esConstante = simbolo.categoria == TablaSimbolos.Categoria.CONSTANTE;
@@ -1089,8 +1213,8 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
     if (indiceOperador < 0) {
       // Termina en ++/--: el elemento/variable debe ser numerico.
-      if (aridadOk && !esConstante && simbolo.tipo != TablaSimbolos.TipoDato.ENT && simbolo.tipo != TablaSimbolos.TipoDato.DEC) {
-        ManejadorErrores.reportarOperandoNoNumerico(idToken, simbolo.tipo);
+      if (aridadOk && !esConstante && tipoDestino != TablaSimbolos.TipoDato.ENT && tipoDestino != TablaSimbolos.TipoDato.DEC) {
+        ManejadorErrores.reportarOperandoNoNumerico(idToken, tipoDestino);
       }
       if (rastrear) {
         Object uno = simbolo.tipo == TablaSimbolos.TipoDato.DEC ? (Object) 1.0 : (Object) 1L;
@@ -1101,8 +1225,12 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
 
     Node valor = node.jjtGetChild(indiceOperador + 1);
     TablaSimbolos.TipoDato tipoValor = (TablaSimbolos.TipoDato) valor.jjtAccept(this, data);
-    if (aridadOk && !esConstante && tipoValor != null && tipoValor != simbolo.tipo) {
-      reportarValorDeOtroTipo(valor, simbolo.tipo, tipoValor, "'" + simbolo.nombre + "' es " + simbolo.tipo);
+    Token operadorAsig = ((SimpleNode) node.jjtGetChild(indiceOperador)).jjtGetFirstToken();
+    if (indiceDeCadena && !esConstante && operadorAsig.kind != ASIGNACION) {
+      ManejadorErrores.reportarOperandoNoNumerico(operadorAsig, TablaSimbolos.TipoDato.CAR); // s[i] +-> ... no aplica a un CAR
+    } else if (aridadOk && !esConstante && tipoValor != null && tipoValor != tipoDestino) {
+      String queSeEsperaba = indiceDeCadena ? "un carácter de '" + simbolo.nombre + "' es CAR" : "'" + simbolo.nombre + "' es " + simbolo.tipo;
+      reportarValorDeOtroTipo(valor, tipoDestino, tipoValor, queSeEsperaba);
     }
     if (rastrear) {
       Object nuevo = valorEstatico(valor);
@@ -1390,7 +1518,10 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
     if (primero.kind == NUMERO_ENTERO) return anotar(node, TablaSimbolos.TipoDato.ENT, null);
     if (primero.kind == NUMERO_DECIMAL) return anotar(node, TablaSimbolos.TipoDato.DEC, null);
     if (primero.kind == CADENA) return anotar(node, TablaSimbolos.TipoDato.CAD, null);
-    if (primero.kind == CARACTER) return anotar(node, TablaSimbolos.TipoDato.CAR, null);
+    if (primero.kind == CARACTER) {
+      if (!primero.image.chars().allMatch(c -> c < 128)) ManejadorErrores.reportarCaracterNoAscii(primero);
+      return anotar(node, TablaSimbolos.TipoDato.CAR, null);
+    }
     if (primero.kind == VERDADERO || primero.kind == FALSO) return anotar(node, TablaSimbolos.TipoDato.BOO, null);
 
     // IDENTIFICADOR: variable/constante/parametro, con 0+ accesos de arreglo entre corchetes.
@@ -1418,11 +1549,46 @@ public final class AnalizadorSemantico implements JERCompilerVisitor, JERCompile
       }
       validarIndiceLiteral(simbolo, i, indice);
     }
+    // Una CAD se lee caracter por caracter: `s[i]` es un CAR.
+    if (esIndiceDeCadena(simbolo, accesos)) return anotar(node, TablaSimbolos.TipoDato.CAR, simbolo);
     if (accesos != simbolo.aridadArreglo) {
       ManejadorErrores.reportarAridadArregloIncorrecta(primero, simbolo.nombre, accesos, simbolo.aridadArreglo);
       return null;
     }
     return anotar(node, simbolo.tipo, simbolo);
+  }
+
+  /**
+   * CONV(tipo, dato): la unica forma de cambiar el tipo de un valor (no hay conversion automatica).
+   * Las combinaciones permitidas estan en conversionValida(). El tipo destino es el token que sigue
+   * al '(' y el dato es el unico hijo.
+   */
+  @Override public Object visit(ASTConversion node, Object data) {
+    Token tipoToken = siguiente(siguiente(node.jjtGetFirstToken())); // CONV ( tipo
+    TablaSimbolos.TipoDato destino = tipoToken == null ? null : tipoDeToken(tipoToken.kind);
+    if (node.jjtGetNumChildren() == 0) return null; // roto por un error sintactico ya reportado
+    TablaSimbolos.TipoDato origen = (TablaSimbolos.TipoDato) node.jjtGetChild(0).jjtAccept(this, data);
+    if (destino == null || destino == TablaSimbolos.TipoDato.VACIO || origen == null) return null;
+    if (!conversionValida(destino, origen)) {
+      ManejadorErrores.reportarConversionInvalida(tipoToken, destino, origen);
+      return null;
+    }
+    return anotar(node, destino, null);
+  }
+
+  /**
+   * Conversiones de CONV: ENT a DEC; DEC a ENT (trunca hacia cero); CAR a ENT (codigo del caracter) y
+   * ENT a CAR; CAD a ENT o DEC (el texto debe ser un numero, se revisa al ejecutar); y cualquier
+   * ENT/DEC/CAR/BOO a CAD (el mismo texto que da la concatenacion). Al mismo tipo no se permite.
+   */
+  static boolean conversionValida(TablaSimbolos.TipoDato destino, TablaSimbolos.TipoDato origen) {
+    switch (destino) {
+      case DEC: return origen == TablaSimbolos.TipoDato.ENT || origen == TablaSimbolos.TipoDato.CAD;
+      case ENT: return origen == TablaSimbolos.TipoDato.DEC || origen == TablaSimbolos.TipoDato.CAR || origen == TablaSimbolos.TipoDato.CAD;
+      case CAR: return origen == TablaSimbolos.TipoDato.ENT;
+      case CAD: return origen != TablaSimbolos.TipoDato.CAD && origen != TablaSimbolos.TipoDato.VACIO;
+      default: return false;
+    }
   }
 
   @Override public Object visit(ASTLlamadaFuncion node, Object data) {

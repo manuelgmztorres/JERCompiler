@@ -90,6 +90,7 @@ public final class OptimizadorCuadruplos {
       if (opSalida.equals("ASIG")) {
         String c = valorRegistrable(a, tipo);
         referencias.remove(destino);
+        olvidarElementosDe(destino); // una CAD con valor nuevo: sus caracteres anotados ya no valen
         if (c != null) constantes.put(destino, c); else constantes.remove(destino);
       } else if (op.equals("RESERVAR")) {
         arreglosLocales.add(destino);
@@ -103,6 +104,7 @@ public final class OptimizadorCuadruplos {
         if (c != null) { opSalida = "ASIG"; a = c; b = null; constantes.put(destino, c); propagados++; }
         else referencias.put(destino, clave); // posible fila de matriz
       } else if (op.equals("ASIG_ELEM")) {
+        constantes.remove(raizDe(rutaDe(destino))); // `s[i] = c` cambia la CAD s: su valor anotado ya no vale
         escribirElemento(destino, b, a, tipo);
       } else if (op.equals("LLAMAR")) {
         elementos.clear();                                 // la funcion puede modificar arreglos
@@ -110,6 +112,7 @@ public final class OptimizadorCuadruplos {
         if (destino != null) { constantes.remove(destino); referencias.remove(destino); }
       } else if (escribeResultado(op) && destino != null) {
         constantes.remove(destino); referencias.remove(destino);
+        olvidarElementosDe(destino);
       }
 
       salida.emitir(opSalida, a, b, destino, tipo);
@@ -151,6 +154,12 @@ public final class OptimizadorCuadruplos {
       final String prefijo = raiz + "[";
       elementos.keySet().removeIf(k -> k.startsWith(prefijo)); // indice desconocido: pudo ser cualquiera
     }
+  }
+
+  /** Los caracteres anotados de una CAD (`s[0]`) cuando la CAD entera recibe otro valor. */
+  private void olvidarElementosDe(final String nombre) {
+    final String prefijo = nombre + "[";
+    elementos.keySet().removeIf(k -> k.startsWith(prefijo));
   }
 
   /** Despues de un RESERVAR el arreglo es nuevo: no vale nada de lo anotado sobre el anterior. */

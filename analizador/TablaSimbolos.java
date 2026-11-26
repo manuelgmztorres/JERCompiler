@@ -42,6 +42,12 @@ public final class TablaSimbolos {
     // propia declaracion de este simbolo: sirve para rechazar "ENT x -> x;", que leeria un
     // valor que todavia no existe.
     public boolean enInicializacion = false;
+    // Solo en funciones: cuantas dimensiones tiene cada parametro (0 = escalar; 1 en `ENT v[]`,
+    // 2 en `ENT m[][]`), en el mismo orden que tiposParametros. Un arreglo se recibe por referencia.
+    public List<Integer> aridadesParametros;
+    // true en las funciones que trae el lenguaje (LONG): no tienen declaracion en el programa,
+    // no salen en la tabla de tipos y aceptan argumentos de mas de un tipo.
+    public boolean predefinida = false;
 
     public Simbolo(String nombre, Categoria categoria, TipoDato tipo, int aridadArreglo,
                     List<TipoDato> tiposParametros, Token declaracion, int[] tamanios, String ambito) {

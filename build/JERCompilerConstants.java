@@ -51,85 +51,87 @@ public interface JERCompilerConstants {
   /** RegularExpression Id. */
   int IMP = 28;
   /** RegularExpression Id. */
-  int VERDADERO = 29;
+  int CONV = 29;
   /** RegularExpression Id. */
-  int FALSO = 30;
+  int VERDADERO = 30;
   /** RegularExpression Id. */
-  int NUMERO_DECIMAL = 31;
+  int FALSO = 31;
   /** RegularExpression Id. */
-  int NUMERO_ENTERO = 32;
+  int NUMERO_DECIMAL = 32;
   /** RegularExpression Id. */
-  int CADENA = 33;
+  int NUMERO_ENTERO = 33;
   /** RegularExpression Id. */
-  int CARACTER = 34;
+  int CADENA = 34;
   /** RegularExpression Id. */
-  int STRING_NO_CERRADA = 35;
+  int CARACTER = 35;
   /** RegularExpression Id. */
-  int CARACTER_INVALIDO = 36;
+  int STRING_NO_CERRADA = 36;
   /** RegularExpression Id. */
-  int ASIG_INC = 37;
+  int CARACTER_INVALIDO = 37;
   /** RegularExpression Id. */
-  int ASIG_DEC = 38;
+  int ASIG_INC = 38;
   /** RegularExpression Id. */
-  int ASIGNACION = 39;
+  int ASIG_DEC = 39;
   /** RegularExpression Id. */
-  int POTENCIA = 40;
+  int ASIGNACION = 40;
   /** RegularExpression Id. */
-  int RAIZ = 41;
+  int POTENCIA = 41;
   /** RegularExpression Id. */
-  int INC = 42;
+  int RAIZ = 42;
   /** RegularExpression Id. */
-  int DEC_OP = 43;
+  int INC = 43;
   /** RegularExpression Id. */
-  int MAYOR_IGUAL = 44;
+  int DEC_OP = 44;
   /** RegularExpression Id. */
-  int MENOR_IGUAL = 45;
+  int MAYOR_IGUAL = 45;
   /** RegularExpression Id. */
-  int DIFERENTE = 46;
+  int MENOR_IGUAL = 46;
   /** RegularExpression Id. */
-  int SUMA = 47;
+  int DIFERENTE = 47;
   /** RegularExpression Id. */
-  int RESTA = 48;
+  int SUMA = 48;
   /** RegularExpression Id. */
-  int MULT = 49;
+  int RESTA = 49;
   /** RegularExpression Id. */
-  int DIV = 50;
+  int MULT = 50;
   /** RegularExpression Id. */
-  int MODULO = 51;
+  int DIV = 51;
   /** RegularExpression Id. */
-  int IGUAL = 52;
+  int MODULO = 52;
   /** RegularExpression Id. */
-  int MAYOR_QUE = 53;
+  int IGUAL = 53;
   /** RegularExpression Id. */
-  int MENOR_QUE = 54;
+  int MAYOR_QUE = 54;
   /** RegularExpression Id. */
-  int AND = 55;
+  int MENOR_QUE = 55;
   /** RegularExpression Id. */
-  int OR = 56;
+  int AND = 56;
   /** RegularExpression Id. */
-  int NOT = 57;
+  int OR = 57;
   /** RegularExpression Id. */
-  int APERTURA_PAREN = 58;
+  int NOT = 58;
   /** RegularExpression Id. */
-  int CIERRE_PAREN = 59;
+  int APERTURA_PAREN = 59;
   /** RegularExpression Id. */
-  int APERTURA_BLOQUE = 60;
+  int CIERRE_PAREN = 60;
   /** RegularExpression Id. */
-  int CIERRE_BLOQUE = 61;
+  int APERTURA_BLOQUE = 61;
   /** RegularExpression Id. */
-  int APERTURA_CORCHETE = 62;
+  int CIERRE_BLOQUE = 62;
   /** RegularExpression Id. */
-  int CIERRE_CORCHETE = 63;
+  int APERTURA_CORCHETE = 63;
   /** RegularExpression Id. */
-  int FIN_INSTRUCCION = 64;
+  int CIERRE_CORCHETE = 64;
   /** RegularExpression Id. */
-  int SEPARADOR = 65;
+  int FIN_INSTRUCCION = 65;
   /** RegularExpression Id. */
-  int DOS_PUNTOS = 66;
+  int SEPARADOR = 66;
   /** RegularExpression Id. */
-  int IDENTIFICADOR = 67;
+  int DOS_PUNTOS = 67;
   /** RegularExpression Id. */
-  int ERROR_LEXICO = 68;
+  int IDENTIFICADOR = 68;
+  /** RegularExpression Id. */
+  int ERROR_LEXICO = 69;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -167,6 +169,7 @@ public interface JERCompilerConstants {
     "\"RET\"",
     "\"OBT\"",
     "\"IMP\"",
+    "\"CONV\"",
     "\"VERDADERO\"",
     "\"FALSO\"",
     "<NUMERO_DECIMAL>",

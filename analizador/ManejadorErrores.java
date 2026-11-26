@@ -254,6 +254,12 @@ public final class ManejadorErrores implements JERCompilerConstants {
    */
   public static void reportarSimboloDuplicado(Token tokenNuevo, TablaSimbolos.Categoria categoriaNueva, TablaSimbolos.Simbolo previo) {
     String nombre = tokenNuevo.image;
+    if (previo.predefinida) {
+      registrar(new ErrorJER("ERROR SEMÁNTICO", tokenNuevo.beginLine, tokenNuevo.beginColumn,
+        "'" + nombre + "' es una función propia del lenguaje; no puede declararse de nuevo.",
+        "Use un nombre distinto.", true));
+      return;
+    }
     String comoPrevio = descripcionCategoria(previo.categoria);
     String comoNuevo = descripcionCategoria(categoriaNueva);
     registrar(new ErrorJER("ERROR SEMÁNTICO", tokenNuevo.beginLine, tokenNuevo.beginColumn,
@@ -278,7 +284,9 @@ public final class ManejadorErrores implements JERCompilerConstants {
   public static void reportarTipoIncompatibleEnOperacion(Token token, TablaSimbolos.TipoDato tipoA, TablaSimbolos.TipoDato tipoB) {
     registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
       "tipos incompatibles: " + tipoA + " y " + tipoB + " en la misma operación.",
-      "JER no convierte tipos automáticamente; use valores del mismo tipo.", true));
+      AnalizadorSemantico.conversionValida(tipoA, tipoB)
+        ? "JER no convierte tipos automáticamente; use valores del mismo tipo o conviértalo con CONV(" + tipoA + ", valor)."
+        : "JER no convierte tipos automáticamente; use valores del mismo tipo.", true));
   }
 
   /**
@@ -290,9 +298,11 @@ public final class ManejadorErrores implements JERCompilerConstants {
       String resto, TablaSimbolos.TipoDato tipoResto, boolean esVariable) {
     registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
       "tipos incompatibles: '" + operando + "' es " + tipoOperando + ", pero " + resto + " es " + tipoResto + ".",
-      esVariable
-        ? "JER no convierte tipos automáticamente; declare '" + operando + "' como " + tipoResto + " o use solo valores " + tipoResto + "."
-        : "JER no convierte tipos automáticamente; use solo valores " + tipoResto + ".", true));
+      AnalizadorSemantico.conversionValida(tipoResto, tipoOperando)
+        ? "JER no convierte tipos automáticamente; use CONV(" + tipoResto + ", " + operando + ") o solo valores " + tipoResto + "."
+        : esVariable
+          ? "JER no convierte tipos automáticamente; declare '" + operando + "' como " + tipoResto + " o use solo valores " + tipoResto + "."
+          : "JER no convierte tipos automáticamente; use solo valores " + tipoResto + ".", true));
   }
 
   /**
@@ -357,6 +367,43 @@ public final class ManejadorErrores implements JERCompilerConstants {
       "'" + nombre + "' espera " + esperados + " argumento(s), se dieron " + dados + ".",
       (dados < esperados ? "Faltan " + (esperados - dados) : "Sobran " + (dados - esperados))
         + " argumento(s); revise la declaración de '" + nombre + "'.", true));
+  }
+
+  /** CONV(tipo, dato) entre dos tipos que no tienen conversion (o al mismo tipo). */
+  public static void reportarConversionInvalida(Token token, TablaSimbolos.TipoDato destino, TablaSimbolos.TipoDato origen) {
+    String detalle = destino == origen
+      ? "el dato ya es " + origen + ": CONV(" + destino + ", ...) no cambia nada."
+      : "no se puede convertir un " + origen + " a " + destino + ".";
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn, detalle,
+      "Conversiones válidas: ENT a DEC/CAR/CAD, DEC a ENT/CAD, CAR a ENT/CAD, CAD a ENT/DEC y BOO a CAD.", true));
+  }
+
+  /** Argumento de una funcion predefinida (LONG) de un tipo que no acepta. */
+  public static void reportarArgumentoPredefinidaInvalido(Token token, String nombre, String queAcepta) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "'" + nombre + "' solo acepta " + queAcepta + ".",
+      "Por ejemplo: " + nombre + "(texto) o " + nombre + "(arreglo).", true));
+  }
+
+  /** Un parametro arreglo recibio un escalar (o al reves), o un arreglo de otro tipo o dimensiones. */
+  public static void reportarArgumentoArregloIncorrecto(Token token, String funcion, int posicion, String esperado, String recibido) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "el parámetro " + posicion + " de '" + funcion + "' es " + esperado + ", pero se pasó " + recibido + ".",
+      "Un parámetro arreglo recibe el nombre del arreglo, sin índices: " + funcion + "(v).", true));
+  }
+
+  /** Un arreglo CONST no puede pasarse a una funcion: la funcion lo recibe por referencia y podria cambiarlo. */
+  public static void reportarArregloConstanteComoArgumento(Token token, String nombre) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "no se puede pasar el arreglo constante '" + nombre + "' a una función.",
+      "La función recibe el arreglo original y podría modificarlo; declare '" + nombre + "' sin CONST.", true));
+  }
+
+  /** Un literal CAR con un caracter fuera de ASCII (acentos, ñ): no cabe en un solo caracter al ejecutar. */
+  public static void reportarCaracterNoAscii(Token token) {
+    registrar(new ErrorJER("ERROR SEMÁNTICO", token.beginLine, token.beginColumn,
+      "el carácter " + token.image + " no se puede guardar en un CAR (solo letras sin acento, dígitos y símbolos simples).",
+      "Use un CAD si necesita acentos o ñ, por ejemplo \"" + token.image.substring(1, token.image.length() - 1) + "\".", true));
   }
 
   public static void reportarAsignacionAConstante(Token id, String nombre) {
@@ -998,7 +1045,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
   private static boolean esInicioDeValor(int tipo) {
     return tipo == IDENTIFICADOR || tipo == NUMERO_ENTERO || tipo == NUMERO_DECIMAL || tipo == CADENA
-      || tipo == CARACTER || tipo == VERDADERO || tipo == FALSO || tipo == APERTURA_PAREN || tipo == APERTURA_CORCHETE;
+      || tipo == CARACTER || tipo == VERDADERO || tipo == FALSO || tipo == APERTURA_PAREN || tipo == APERTURA_CORCHETE || tipo == CONV;
   }
   /**
    * true si el token en indiceToken es un IDENTIFICADOR seguido de una continuacion valida
@@ -1161,7 +1208,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     File carpeta = archivo.getAbsoluteFile().getParentFile();
     boolean listo = gpp(carpeta, "g++", "-S", cppNombre, "-o", s)
         && gpp(carpeta, "g++", "-c", cppNombre, "-o", o)
-        && gpp(carpeta, "g++", o, "-o", exe);
+        && gpp(carpeta, "g++", "-static", o, "-o", exe); // -static: el .exe corre aunque las DLL de MinGW no esten en el PATH
     if (listo) System.out.println("Ejecutable listo. Para correrlo: " + archivoCpp(".exe").getPath());
   }
 
@@ -1197,7 +1244,16 @@ public final class ManejadorErrores implements JERCompilerConstants {
       "Nombre", "Categoría", "Tipo", "Dimensiones", "Ámbito", "Línea", "Usado", "Parámetros");
     w.println("----------------------+------------+--------+-------------+------------------+--------+-------+------------------------");
     for (TablaSimbolos.Simbolo simbolo : tabla.todos()) {
-      String parametros = simbolo.tiposParametros == null ? "" : simbolo.tiposParametros.toString();
+      if (simbolo.predefinida) continue;
+      String parametros = "";
+      if (simbolo.tiposParametros != null) {
+        List<String> textos = new ArrayList<String>();
+        for (int i = 0; i < simbolo.tiposParametros.size(); i++) {
+          int aridad = simbolo.aridadesParametros == null ? 0 : simbolo.aridadesParametros.get(i);
+          textos.add(simbolo.tiposParametros.get(i) + "[]".repeat(aridad));
+        }
+        parametros = "[" + String.join(", ", textos) + "]";
+      }
       w.printf("%-20s | %-10s | %-6s | %-11d | %-16s | %-6d | %-5s | %s%n",
         simbolo.nombre, descripcionCategoria(simbolo.categoria), simbolo.tipo,
         simbolo.aridadArreglo, simbolo.ambito, simbolo.declaracion.beginLine,

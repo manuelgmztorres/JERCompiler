@@ -121,7 +121,7 @@ FUN VACIO sinPred(CAD op, ENT n) {
     }
 }
 
-# TERMINAR dentro de un EVALUAR que esta dentro de un bucle: solo sale del EVALUAR.
+# TERMINAR dentro de un EVALUAR que esta dentro de un bucle: sale del bucle.
 FUN VACIO anidado() {
     REPETIR (ENT i -> 0; i < 3; i++) {
         EVALUAR i {

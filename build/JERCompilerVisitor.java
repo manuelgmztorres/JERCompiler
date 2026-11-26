@@ -32,6 +32,7 @@ public interface JERCompilerVisitor
   public Object visit(ASTUnaryMinus node, Object data);
   public Object visit(ASTLiteralArreglo node, Object data);
   public Object visit(ASTValorSimple node, Object data);
+  public Object visit(ASTConversion node, Object data);
   public Object visit(ASTLlamadaFuncion node, Object data);
 }
-/* JavaCC - OriginalChecksum=8f854f8df9288942513f13b63522474b (do not edit this line) */
+/* JavaCC - OriginalChecksum=1faa51d73e1b94b0c86f550b2e166c71 (do not edit this line) */

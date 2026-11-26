@@ -97,8 +97,11 @@ public class JERCompilerDefaultVisitor implements JERCompilerVisitor{
   public Object visit(ASTValorSimple node, Object data){
     return defaultVisit(node, data);
   }
+  public Object visit(ASTConversion node, Object data){
+    return defaultVisit(node, data);
+  }
   public Object visit(ASTLlamadaFuncion node, Object data){
     return defaultVisit(node, data);
   }
 }
-/* JavaCC - OriginalChecksum=17f0285863d34dcefbaf946e00b74931 (do not edit this line) */
+/* JavaCC - OriginalChecksum=22facc2475f6b52aebb09fe05aefa90a (do not edit this line) */

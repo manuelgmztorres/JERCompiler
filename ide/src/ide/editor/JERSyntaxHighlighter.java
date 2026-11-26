@@ -13,7 +13,7 @@ public final class JERSyntaxHighlighter {
             "ENT", "DEC", "CAD", "CAR", "BOO", "VACIO", "CONST",
             "SI", "SINO", "MIENTRAS", "REPETIR", "HACER",
             "EVALUAR", "CUANDO", "PRED", "TERMINAR",
-            "FUN", "RET", "OBT", "IMP", "AND", "OR", "NOT"
+            "FUN", "RET", "OBT", "IMP", "AND", "OR", "NOT", "CONV", "LONG"
     };
 
     private static final Pattern PATRON = Pattern.compile(

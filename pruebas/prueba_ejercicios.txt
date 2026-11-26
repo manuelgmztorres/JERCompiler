@@ -1,0 +1,127 @@
+# Ejercicios tipicos de programacion: CONV, LONG, arreglos como parametro, s[i] y TERMINAR en un menu.
+# Debe dar 0 errores. Entrada para probar el .exe (una por linea): 4 7 10 8 5 / reconocer / 2 / 0
+# Cada IMP lleva al lado lo que debe imprimir con esa entrada.
+
+CONST ENT TAM -> 5;
+
+# --- Arreglos como parametro (se reciben por referencia) ---
+FUN ENT mayor(ENT v[]) {
+    ENT m -> v[0];
+    REPETIR (ENT i -> 1; i < LONG(v); i++) {
+        SI v[i] > m { m -> v[i]; }
+    }
+    RET m;
+}
+
+FUN VACIO ordenar(ENT v[]) {
+    ENT n -> LONG(v);
+    REPETIR (ENT i -> 0; i < n - 1; i++) {
+        REPETIR (ENT j -> 0; j < n - 1 - i; j++) {
+            SI v[j] > v[j + 1] {
+                ENT t -> v[j];
+                v[j] -> v[j + 1];
+                v[j + 1] -> t;
+            }
+        }
+    }
+}
+
+FUN DEC promedio(ENT v[]) {
+    ENT suma -> 0;
+    REPETIR (ENT i -> 0; i < LONG(v); i++) { suma +-> v[i]; }
+    RET CONV(DEC, suma) / CONV(DEC, LONG(v));
+}
+
+FUN ENT sumaMatriz(ENT m[][], ENT filas, ENT columnas) {
+    ENT total -> 0;
+    REPETIR (ENT i -> 0; i < filas; i++) {
+        REPETIR (ENT j -> 0; j < columnas; j++) { total +-> m[i][j]; }
+    }
+    RET total;
+}
+
+# --- Cadenas ---
+FUN BOO esPalindromo(CAD s) {
+    ENT i -> 0;
+    ENT j -> LONG(s) - 1;
+    MIENTRAS i < j {
+        SI s[i] != s[j] { RET FALSO; }
+        i++;
+        j--;
+    }
+    RET VERDADERO;
+}
+
+FUN ENT contarVocales(CAD s) {
+    ENT cuenta -> 0;
+    REPETIR (ENT i -> 0; i < LONG(s); i++) {
+        EVALUAR s[i] {
+            CUANDO 'a': cuenta++;
+            CUANDO 'e': cuenta++;
+            CUANDO 'i': cuenta++;
+            CUANDO 'o': cuenta++;
+            CUANDO 'u': cuenta++;
+        }
+    }
+    RET cuenta;
+}
+
+FUN CAD invertir(CAD s) {
+    CAD r -> s;
+    ENT n -> LONG(s);
+    REPETIR (ENT i -> 0; i < n; i++) { r[i] -> s[n - 1 - i]; }
+    RET r;
+}
+
+# Cifrado Cesar sobre letras minusculas: CAR <-> ENT con CONV.
+FUN CAD cesar(CAD s, ENT k) {
+    CAD r -> s;
+    REPETIR (ENT i -> 0; i < LONG(s); i++) {
+        ENT codigo -> CONV(ENT, s[i]);
+        SI codigo >= CONV(ENT, 'a') AND codigo <= CONV(ENT, 'z') {
+            r[i] -> CONV(CAR, (codigo - CONV(ENT, 'a') + k) % 26 + CONV(ENT, 'a'));
+        }
+    }
+    RET r;
+}
+
+FUN VACIO principal() {
+    ENT datos[TAM];
+    REPETIR (ENT i -> 0; i < TAM; i++) { ENT x; OBT x; datos[i] -> x; }
+    IMP "Mayor: " + mayor(datos);                  # Mayor: 10
+    IMP "Promedio: " + promedio(datos);            # Promedio: 6.8
+    ordenar(datos);
+    IMP datos[0] + " " + datos[4];                 # 4 10 (el arreglo original quedo ordenado)
+
+    ENT m[2][3] -> [[1, 2, 3], [4, 5, 6]];
+    IMP sumaMatriz(m, 2, 3);                       # 21
+
+    CAD palabra;
+    OBT palabra;
+    IMP esPalindromo(palabra);                     # VERDADERO
+    IMP contarVocales("murcielago");               # 5
+    IMP invertir("hola");                          # aloh
+    IMP cesar("xyz abc", 3);                       # abc def
+
+    # Conversiones
+    IMP CONV(DEC, 7) / 2.0;                        # 3.5
+    IMP CONV(ENT, 7.9);                            # 7
+    IMP CONV(ENT, -7.9);                           # -7 (trunca hacia cero)
+    IMP CONV(CAD, 25) + CONV(CAD, 'x');            # 25x
+    IMP CONV(ENT, "123") + 1;                      # 124
+    IMP CONV(DEC, "2.5") * 2.0;                    # 5.0
+    IMP 1234.5678;                                 # 1234.5678
+    IMP 2 ** 10;                                   # 1024
+
+    # Menu: TERMINAR dentro del EVALUAR sale del MIENTRAS
+    ENT op;
+    MIENTRAS VERDADERO {
+        OBT op;
+        EVALUAR op {
+            CUANDO 0: TERMINAR;
+            CUANDO 1: IMP "Uno";
+            PRED: IMP "Opcion " + op;              # Opcion 2
+        }
+    }
+    IMP "Fin del menu";                            # Fin del menu
+}
