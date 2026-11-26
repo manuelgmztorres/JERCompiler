@@ -15,8 +15,8 @@ public final class TablaCuadruplos {
 
   /**
    * Una fila de la tabla: operador, dos argumentos y un resultado. Una celda en null es una celda
-   * vacia y se imprime en blanco. `tipo` es el tipo del resultado: se guarda en memoria para el
-   * futuro generador de codigo objeto, pero la tabla impresa no lo muestra. `resultado` no es final
+   * vacia y se imprime en blanco. `tipo` es el tipo del resultado: GeneradorCppCuadruplos lo usa para
+   * declarar las variables y temporales, pero la tabla impresa no lo muestra. `resultado` no es final
    * porque el destino de un salto hacia adelante se escribe despues, cuando se llega a el.
    */
   public static final class Cuadruplo {
@@ -25,6 +25,8 @@ public final class TablaCuadruplos {
     public final String arg2;
     public String resultado;
     public final TablaSimbolos.TipoDato tipo;
+    /** Linea del fuente JER de la sentencia que genero la fila (0 = ninguna): la usan los errores de ejecucion del codigo objeto. */
+    public int linea;
 
     public Cuadruplo(String operador, String arg1, String arg2, String resultado, TablaSimbolos.TipoDato tipo) {
       this.operador = operador; this.arg1 = arg1; this.arg2 = arg2; this.resultado = resultado; this.tipo = tipo;
@@ -32,12 +34,16 @@ public final class TablaCuadruplos {
   }
 
   private final List<Cuadruplo> filas = new ArrayList<Cuadruplo>();
+  /** Linea del fuente que se anota en cada fila que se emita (la fija el generador al empezar cada sentencia). */
+  public int lineaActual = 0;
   private int contadorTemporales = 0;
   private boolean cerrada = false;
 
   /** Agrega una fila y devuelve su numero (el primero es 1). */
   public int emitir(String operador, String arg1, String arg2, String resultado, TablaSimbolos.TipoDato tipo) {
-    filas.add(new Cuadruplo(operador, arg1, arg2, resultado, tipo));
+    Cuadruplo fila = new Cuadruplo(operador, arg1, arg2, resultado, tipo);
+    fila.linea = lineaActual;
+    filas.add(fila);
     return filas.size();
   }
 

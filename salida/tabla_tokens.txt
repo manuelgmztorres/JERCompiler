@@ -1,5 +1,5 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: pruebas/prueba_herramienta.txt
+Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/estres/t7_obt_malo.txt
 No.   | Lexema               | Token                        | Línea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | FUN                  | FUN                          | 1      | 1
@@ -7,27 +7,14 @@ No.   | Lexema               | Token                        | Línea  | Columna
 3     | principal            | <IDENTIFICADOR>              | 1      | 11
 4     | (                    | (                            | 1      | 20
 5     | )                    | )                            | 1      | 21
-6     | {                    | {                            | 1      | 22
+6     | {                    | {                            | 1      | 23
 7     | ENT                  | ENT                          | 2      | 5
-8     | edad                 | <IDENTIFICADOR>              | 2      | 9
-9     | ->                   | ->                           | 2      | 14
-10    | 25                   | <NUMERO_ENTERO>              | 2      | 17
-11    | ;                    | ;                            | 2      | 19
-12    | SI                   | SI                           | 3      | 5
-13    | (                    | (                            | 3      | 8
-14    | edad                 | <IDENTIFICADOR>              | 3      | 9
-15    | >=                   | >=                           | 3      | 14
-16    | 18                   | <NUMERO_ENTERO>              | 3      | 17
-17    | )                    | )                            | 3      | 19
-18    | {                    | {                            | 3      | 20
-19    | IMP                  | IMP                          | 4      | 9
-20    | "Eres Mayor de Edad" | <CADENA>                     | 4      | 13
-21    | ;                    | ;                            | 4      | 33
-22    | }                    | }                            | 5      | 5
-23    | SINO                 | SINO                         | 5      | 7
-24    | {                    | {                            | 5      | 12
-25    | IMP                  | IMP                          | 6      | 9
-26    | "No Eres Mayor de Edad" | <CADENA>                     | 6      | 13
-27    | ;                    | ;                            | 6      | 36
-28    | }                    | }                            | 7      | 5
-29    | }                    | }                            | 8      | 1
+8     | x                    | <IDENTIFICADOR>              | 2      | 9
+9     | ;                    | ;                            | 2      | 10
+10    | OBT                  | OBT                          | 3      | 5
+11    | x                    | <IDENTIFICADOR>              | 3      | 9
+12    | ;                    | ;                            | 3      | 10
+13    | IMP                  | IMP                          | 4      | 5
+14    | x                    | <IDENTIFICADOR>              | 4      | 9
+15    | ;                    | ;                            | 4      | 10
+16    | }                    | }                            | 5      | 1

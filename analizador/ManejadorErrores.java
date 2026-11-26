@@ -132,8 +132,8 @@ public final class ManejadorErrores implements JERCompilerConstants {
     if (JERCompiler.totalErrores == 0 && analizador != null) {
       guardarTablaDeTipos(nombre, analizador.obtenerTabla());
       if (raiz != null) {
-        generarCodigoIntermedio(nombre, raiz, analizador.obtenerTabla());
-        generarCodigoObjeto(nombre, raiz, analizador.obtenerTabla());
+        TablaCuadruplos optimizada = generarCodigoIntermedio(nombre, raiz, analizador.obtenerTabla());
+        generarCodigoObjeto(nombre, optimizada, analizador.obtenerTabla());
       }
     } else if (JERCompiler.totalErrores > 0) {
       // Si hay errores, se sobrescriben los archivos con el encabezado y el mensaje
@@ -1146,8 +1146,11 @@ public final class ManejadorErrores implements JERCompilerConstants {
 
   private static final String ARCHIVO_CUADRUPLOS = ARCHIVO_TABLA.replace("tabla_tokens.txt", "cuadruplos.txt");
 
-  /** Con 0 errores: genera la tabla de cuadruplos, la imprime y la guarda junto a las demas tablas. */
-  private static void generarCodigoIntermedio(String nombreArchivo, ASTPrograma raiz, TablaSimbolos simbolos) {
+  /**
+   * Con 0 errores: genera la tabla de cuadruplos, la imprime y la guarda junto a las demas tablas. Devuelve la
+   * tabla OPTIMIZADA (de ella sale el codigo objeto) o null si el generador no pudo traducir todo el programa.
+   */
+  private static TablaCuadruplos generarCodigoIntermedio(String nombreArchivo, ASTPrograma raiz, TablaSimbolos simbolos) {
     GeneradorCodigo generador = new GeneradorCodigo(simbolos);
     TablaCuadruplos cuadruplos = generador.generar(raiz);
     String texto = cuadruplos.formatear(nombreArchivo);
@@ -1178,6 +1181,7 @@ public final class ManejadorErrores implements JERCompilerConstants {
     System.out.println(textoOptimizado);
     guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cuadruplos_opt.txt"), textoOptimizado, "los cuádruplos optimizados");
     guardarTexto(ARCHIVO_CUADRUPLOS.replace("cuadruplos.txt", "cod_tres_dir_opt.txt"), optimizada.formatearListado(nombreArchivo), "el listado optimizado");
+    return generador.noSoportado().isEmpty() ? optimizada : null;
   }
 
   private static final String TRADUCCION_CPP = "CodigoTraducido";
@@ -1191,12 +1195,16 @@ public final class ManejadorErrores implements JERCompilerConstants {
   }
 
   /**
-   * Con 0 errores: traduce el programa a C++ (salida/CodigoTraducido.cpp) y lo compila con MinGW
-   * en tres pasos: ensamblador (.s), codigo objeto (.o) y enlace al ejecutable (.exe).
+   * Con 0 errores: traduce el codigo intermedio OPTIMIZADO a C++ (salida/CodigoTraducido.cpp) y lo compila con
+   * MinGW en tres pasos: ensamblador (.s), codigo objeto (.o) y enlace al ejecutable (.exe).
    */
-  private static void generarCodigoObjeto(String nombreArchivo, ASTPrograma raiz, TablaSimbolos simbolos) {
-    GeneradorCpp traductor = new GeneradorCpp(simbolos);
-    String cpp = traductor.generar(raiz, nombreArchivo);
+  private static void generarCodigoObjeto(String nombreArchivo, TablaCuadruplos optimizada, TablaSimbolos simbolos) {
+    if (optimizada == null) {
+      System.out.println("[ADVERTENCIA] El código intermedio está incompleto: no se genera el código objeto.");
+      return;
+    }
+    GeneradorCppCuadruplos traductor = new GeneradorCppCuadruplos(simbolos);
+    String cpp = traductor.generar(optimizada);
     File archivo = archivoCpp(".cpp");
     guardarTexto(archivo.getPath(), cpp, "la traducción a C++");
     System.out.println("TRADUCCIÓN A C++: " + archivo.getPath());

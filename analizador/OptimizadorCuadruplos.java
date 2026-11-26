@@ -65,7 +65,7 @@ public final class OptimizadorCuadruplos {
       if (op.equals("FUN") || op.equals("ETIQ")) {          // inicio de bloque
         nuevoBloque();
         if (op.equals("FUN")) arreglosLocales.clear();
-        salida.emitir(op, f.arg1, f.arg2, f.resultado, f.tipo);
+        salida.lineaActual = f.linea; salida.emitir(op, f.arg1, f.arg2, f.resultado, f.tipo);
         continue;
       }
 
@@ -115,6 +115,7 @@ public final class OptimizadorCuadruplos {
         olvidarElementosDe(destino);
       }
 
+      salida.lineaActual = f.linea; // la fila optimizada sigue viniendo de la misma linea del fuente
       salida.emitir(opSalida, a, b, destino, tipo);
 
       // El fin de bloque vacia el estado: la fila siguiente es lider.

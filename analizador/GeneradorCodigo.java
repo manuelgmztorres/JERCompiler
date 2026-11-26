@@ -150,6 +150,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
   // Sentencias
 
   void sentencia(Node nodo) {
+    marcarLinea(nodo);
     if (nodo instanceof ASTBloque) {
       for (int i = 0; i < nodo.jjtGetNumChildren(); i++) sentencia(nodo.jjtGetChild(i));
     } else if (esDeclaracionDeVariable(nodo)) {
@@ -182,7 +183,11 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     }
   }
 
+  /** Las filas que se emitan desde aqui llevan la linea donde empieza `nodo`. */
+  private void marcarLinea(Node nodo) { tabla.lineaActual = ((SimpleNode) nodo).jjtGetFirstToken().beginLine; }
+
   void declaracion(Node nodo, boolean global) {
+    marcarLinea(nodo);
     TablaSimbolos.Simbolo variable = AnalizadorSemantico.Anotacion.de(nodo).simbolo;
     String nombre = global ? variable.nombre : registrarLocal(variable);
     if (variable.aridadArreglo > 0) { declararArreglo(nodo, variable, nombre); return; }
@@ -605,6 +610,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
     salidas.push(lista);
     salidasDeBucle.push(lista);
     sentencia(partes[0]);
+    marcarLinea(partes[1]);
     String valor = expresion(partes[1], null);
     tabla.emitir("SALTO_VER", valor, null, String.valueOf(inicio), null);
     salidasDeBucle.pop();
@@ -702,6 +708,7 @@ public final class GeneradorCodigo implements JERCompilerConstants {
 
   /** El paso de un REPETIR: `i++`, `i--`, `i +-> e` o `i --> e`. */
   private void paso(ASTPasoRepetir nodo) {
+    marcarLinea(nodo);
     TablaSimbolos.Simbolo variable = AnalizadorSemantico.Anotacion.de(nodo).simbolo;
     int operador = nodo.jjtGetFirstToken().next.kind;
     actualizar(variable, operador, nodo.jjtGetNumChildren() > 0 ? nodo.jjtGetChild(0) : null);
