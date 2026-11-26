@@ -184,16 +184,39 @@ public class ConsolaSalida extends JPanel {
         capturar(comando, timeoutSeg, alTerminar);
     }
 
+    /**
+     * Como ejecutar(), pero para un programa que puede leer del teclado (OBT): la marca de fin va en la MISMA
+     * linea del comando, porque una linea aparte la leeria el propio programa como si fuera un dato. En cmd el
+     * codigo de salida solo se distingue como 0 o 1 (%errorlevel% se expande antes de correr el programa).
+     */
+    public void ejecutarInteractivo(String comando, int timeoutSeg, AlTerminar alTerminar) throws IOException {
+        if (captura != null) throw new IllegalStateException("ya hay una compilación en curso");
+        if (!WINDOWS) escribirEntrada(comando);
+        // El "^" evita que la linea que el shell repite al correr el comando parezca ya la marca de fin.
+        capturar(comando, timeoutSeg, alTerminar, WINDOWS
+                ? comando + " && echo " + MARCA + "^ 0 || echo " + MARCA + "^ 1"
+                : comando + "; echo " + MARCA + " $?");
+    }
+
     /** Ver detectorComandos. */
     public void setDetectorComandos(Function<String, AlTerminar> detector) { this.detectorComandos = detector; }
 
     /** Manda `comando` al shell seguido de la marca y junta su salida hasta verla. */
     private void capturar(String comando, int timeoutSeg, AlTerminar alTerminar) throws IOException {
+        capturar(comando, timeoutSeg, alTerminar, null);
+    }
+
+    /** Con `unaLinea` null la marca va en una segunda linea; si no, esa linea ya trae el comando y la marca. */
+    private void capturar(String comando, int timeoutSeg, AlTerminar alTerminar, String unaLinea) throws IOException {
         Captura c = new Captura(alTerminar);
         captura = c;
         try {
-            enviar(comando);
-            enviar("echo " + MARCA + " " + (WINDOWS ? "%errorlevel%" : "$?"));
+            if (unaLinea != null) {
+                enviar(unaLinea);
+            } else {
+                enviar(comando);
+                enviar("echo " + MARCA + " " + (WINDOWS ? "%errorlevel%" : "$?"));
+            }
         } catch (IOException e) {
             captura = null;
             throw e;

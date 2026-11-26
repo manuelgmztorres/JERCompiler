@@ -1,5 +1,5 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/estres/t7_obt_malo.txt
+Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/pegado.txt
 No.   | Lexema               | Token                        | Línea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | FUN                  | FUN                          | 1      | 1
@@ -7,14 +7,28 @@ No.   | Lexema               | Token                        | Línea  | Columna
 3     | principal            | <IDENTIFICADOR>              | 1      | 11
 4     | (                    | (                            | 1      | 20
 5     | )                    | )                            | 1      | 21
-6     | {                    | {                            | 1      | 23
-7     | ENT                  | ENT                          | 2      | 5
-8     | x                    | <IDENTIFICADOR>              | 2      | 9
-9     | ;                    | ;                            | 2      | 10
-10    | OBT                  | OBT                          | 3      | 5
-11    | x                    | <IDENTIFICADOR>              | 3      | 9
-12    | ;                    | ;                            | 3      | 10
-13    | IMP                  | IMP                          | 4      | 5
-14    | x                    | <IDENTIFICADOR>              | 4      | 9
-15    | ;                    | ;                            | 4      | 10
-16    | }                    | }                            | 5      | 1
+6     | {                    | {                            | 1      | 22
+7     | IMP                  | IMP                          | 2      | 5
+8     | "Hola Mundo"         | <CADENA>                     | 2      | 9
+9     | ;                    | ;                            | 2      | 21
+10    | ENT                  | ENT                          | 3      | 5
+11    | n1                   | <IDENTIFICADOR>              | 3      | 9
+12    | ->                   | ->                           | 3      | 12
+13    | 15                   | <NUMERO_ENTERO>              | 3      | 15
+14    | ;                    | ;                            | 3      | 17
+15    | ENT                  | ENT                          | 4      | 5
+16    | n2                   | <IDENTIFICADOR>              | 4      | 9
+17    | ->                   | ->                           | 4      | 12
+18    | 0                    | <NUMERO_ENTERO>              | 4      | 15
+19    | ;                    | ;                            | 4      | 16
+20    | ENT                  | ENT                          | 5      | 5
+21    | div                  | <IDENTIFICADOR>              | 5      | 9
+22    | ->                   | ->                           | 5      | 13
+23    | n1                   | <IDENTIFICADOR>              | 5      | 16
+24    | /                    | /                            | 5      | 19
+25    | n2                   | <IDENTIFICADOR>              | 5      | 21
+26    | ;                    | ;                            | 5      | 23
+27    | IMP                  | IMP                          | 6      | 5
+28    | div                  | <IDENTIFICADOR>              | 6      | 9
+29    | ;                    | ;                            | 6      | 12
+30    | }                    | }                            | 7      | 1

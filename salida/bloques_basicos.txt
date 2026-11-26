@@ -1,6 +1,6 @@
 BLOQUES BÁSICOS - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/estres/t7_obt_malo.txt
-Bloques: 2
+Archivo: pruebas\fibonacci.txt
+Bloques: 5
 
 FUN _inicio
   [B1]  -> fin
@@ -8,9 +8,26 @@ FUN _inicio
         RET
 
 FUN principal
-  [B2]  -> fin
-        x = 0
-        OBT x
-        IMP x
-        RET
+  [B2]  -> B3
+        IMP "Numero de Iteraciones"
+        iteraciones = 0
+        OBT iteraciones
+        actual = 0
+        siguiente = 1
+        IMP "______________________________"
+        IMP actual
+        IMP siguiente
+        i = 0
+  [B3]  -> B4, B5
+  L1:   t1 = i <= iteraciones
+        SALTO_FAL t1, L2
+  [B4]  -> B3
+        suma = actual + siguiente
+        actual = siguiente
+        siguiente = suma
+        IMP siguiente
+        i = i + 1
+        SALTO L1
+  [B5]  -> fin
+  L2:   RET
 --------------------------------------------

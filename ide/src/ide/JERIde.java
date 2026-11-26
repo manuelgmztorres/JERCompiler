@@ -51,6 +51,7 @@ public class JERIde extends JFrame {
     private final JLabel etiquetaPosicion = new JLabel("");
     private final JButton btnCompilar = new JButton("Compilar");
     private final JButton btnCompilarCompilador = new JButton("Compilar compilador");
+    private final JButton btnEjecutar = new JButton("Ejecutar");
     private final JToggleButton btnModoOscuro = new JToggleButton("Modo oscuro");
     /** Un boton por vista del codigo intermedio: abre el documento en esa vista, o lo oculta si ya la muestra. */
     private final Map<DocumentoTresDirecciones.Vista, JToggleButton> botonesVista = new EnumMap<>(DocumentoTresDirecciones.Vista.class);
@@ -90,6 +91,8 @@ public class JERIde extends JFrame {
         btnBuscar.addActionListener(e -> conRedDeSeguridad(this::mostrarBuscar));
         btnCompilar.addActionListener(e -> conRedDeSeguridad(this::compilar));
         btnCompilar.setToolTipText("Compilar (F5)");
+        btnEjecutar.addActionListener(e -> conRedDeSeguridad(this::ejecutar));
+        btnEjecutar.setToolTipText("Ejecutar el programa del último archivo compilado sin errores (F6); lo que escribas en Salida le llega al programa");
         btnCompilarCompilador.addActionListener(e -> conRedDeSeguridad(this::compilarCompilador));
         btnCompilarCompilador.setToolTipText("Regenerar el compilador JER con compilar.bat: jjtree, javacc y javac");
         // Compilaciones escritas a mano en la consola: refrescan errores, tablas y cuadruplos igual que el boton.
@@ -119,7 +122,7 @@ public class JERIde extends JFrame {
         izquierda.add(separadorToolbar());
         agregarSeccion(izquierda, btnBuscar);
         izquierda.add(separadorToolbar());
-        agregarSeccion(izquierda, btnCompilar, btnCompilarCompilador, btnLimpiar);
+        agregarSeccion(izquierda, btnCompilar, btnEjecutar, btnCompilarCompilador, btnLimpiar);
         JPanel derecha = panelToolbar(FlowLayout.RIGHT);
         agregarSeccion(derecha, botonesVista.values().toArray(new JComponent[0]));
         derecha.add(separadorToolbar());
@@ -160,6 +163,7 @@ public class JERIde extends JFrame {
         atajo(KeyEvent.VK_F, ctrl, "buscarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_H, ctrl, "reemplazarAtajo", this::mostrarBuscar);
         atajo(KeyEvent.VK_F5, 0, "compilarAtajo", () -> { if (btnCompilar.isEnabled()) compilar(); });
+        atajo(KeyEvent.VK_F6, 0, "ejecutarAtajo", () -> { if (btnEjecutar.isEnabled()) ejecutar(); });
         atajo(KeyEvent.VK_T, ctrl, "tresDirAtajo", () -> mostrarTresDir(!consola.codigoIntermedio().documento().isVisible()));
 
 
@@ -493,10 +497,34 @@ public class JERIde extends JFrame {
                 });
     }
 
-    /** Activa o desactiva Compilar y Compilar compilador (solo puede correr uno a la vez). */
+    /** Activa o desactiva Compilar, Ejecutar y Compilar compilador (la consola solo corre un comando del IDE a la vez). */
     private void habilitarCompilacion(boolean habilitar) {
         btnCompilar.setEnabled(habilitar);
+        btnEjecutar.setEnabled(habilitar);
         btnCompilarCompilador.setEnabled(habilitar);
+    }
+
+    /** Corre el .exe que dejo la ultima compilacion sin errores; los datos para OBT se escriben en la pestana Salida. */
+    private void ejecutar() {
+        if (!compilador.ejecutable().isFile()) {
+            consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
+            consola.mostrarMensaje("No hay ejecutable: compila un programa sin errores y con g++ (MinGW) en el PATH.");
+            estado(" Sin ejecutable");
+            return;
+        }
+        habilitarCompilacion(false);
+        estado(" Ejecutando... (escribe en Salida los datos que pida el programa)");
+        consola.setSelectedIndex(PanelConsola.TAB_SALIDA);
+        compilador.ejecutarPrograma(
+                codigo -> {
+                    habilitarCompilacion(true);
+                    estado(codigo == -1 ? " El programa no terminó a tiempo; se detuvo" : " Programa terminado (código " + codigo + ")");
+                },
+                error -> {
+                    habilitarCompilacion(true);
+                    consola.mostrarMensaje("Error al ejecutar: " + error.getMessage());
+                    estado(" Error al ejecutar");
+                });
     }
 
     /** Corre compilar.bat en la consola; mientras tanto no se puede compilar ningun archivo. */

@@ -1,7 +1,11 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/estres/t7_obt_malo.txt
+Archivo: pruebas\fibonacci.txt
 Nombre               | Categoría  | Tipo   | Dimensiones | Ámbito           | Línea  | Usado | Parámetros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
 principal            | función    | VACIO  | 0           | GLOBAL           | 1      | no    | []
-x                    | variable   | ENT    | 0           | principal        | 2      | sí    | 
+iteraciones          | variable   | ENT    | 0           | principal        | 3      | sí    | 
+actual               | variable   | ENT    | 0           | principal        | 5      | sí    | 
+siguiente            | variable   | ENT    | 0           | principal        | 6      | sí    | 
+i                    | variable   | ENT    | 0           | principal        | 12     | sí    | 
+suma                 | variable   | ENT    | 0           | principal        | 13     | sí    | 
 --------------------------------------------

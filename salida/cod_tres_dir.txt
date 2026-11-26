@@ -1,13 +1,4 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/estres/t7_obt_malo.txt
+Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/pegado.txt
 
-FUN _inicio
-        LLAMAR principal, 0
-        RET
-
-FUN principal
-        x = 0
-        OBT x
-        IMP x
-        RET
---------------------------------------------
+Código fuente con errores, no se puede generar el código de tres direcciones.

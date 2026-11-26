@@ -107,4 +107,23 @@ public class EjecutorCompilador {
             alFallar.accept(e);
         }
     }
+
+    /** El ejecutable que deja el compilador (borra el anterior en cada compilacion, asi que es el del ultimo archivo compilado sin errores). */
+    public File ejecutable() { return new File(raiz, "salida" + File.separator + "CodigoTraducido.exe"); }
+
+    /** Un programa puede esperar datos del usuario (OBT): el limite es largo, solo para no dejar uno colgado para siempre. */
+    private static final int TIMEOUT_PROGRAMA_SEG = 600;
+
+    /**
+     * Corre el ejecutable en la consola: lo que el usuario escriba ahi le llega al programa (OBT).
+     * `alTerminar` recibe el codigo de salida, o -1 si se paso del tiempo; `alFallar`, la excepcion si no se pudo usar la consola.
+     */
+    public void ejecutarPrograma(Consumer<Integer> alTerminar, Consumer<Exception> alFallar) {
+        try {
+            consola.ejecutarInteractivo("\"" + ejecutable().getAbsolutePath() + "\"", TIMEOUT_PROGRAMA_SEG,
+                    (salida, codigo, duracion, cancelado) -> alTerminar.accept(cancelado ? -1 : codigo));
+        } catch (IOException | IllegalStateException e) {
+            alFallar.accept(e);
+        }
+    }
 }
