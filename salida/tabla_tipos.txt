@@ -1,11 +1,9 @@
 TABLA DE TIPOS - JERCompiler
-Archivo: pruebas\fibonacci.txt
+Archivo: pruebas\prueba_ide.txt
 Nombre               | Categoría  | Tipo   | Dimensiones | Ámbito           | Línea  | Usado | Parámetros
 ----------------------+------------+--------+-------------+------------------+--------+-------+------------------------
 principal            | función    | VACIO  | 0           | GLOBAL           | 1      | no    | []
-iteraciones          | variable   | ENT    | 0           | principal        | 3      | sí    | 
-actual               | variable   | ENT    | 0           | principal        | 5      | sí    | 
-siguiente            | variable   | ENT    | 0           | principal        | 6      | sí    | 
-i                    | variable   | ENT    | 0           | principal        | 12     | sí    | 
-suma                 | variable   | ENT    | 0           | principal        | 13     | sí    | 
+n1                   | variable   | ENT    | 0           | principal        | 3      | sí    | 
+n2                   | variable   | ENT    | 0           | principal        | 4      | sí    | 
+div                  | variable   | DEC    | 0           | principal        | 5      | sí    | 
 --------------------------------------------

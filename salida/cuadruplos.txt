@@ -1,4 +1,18 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/pegado.txt
-
-Código fuente con errores, no se puede generar el código intermedio.
+Archivo: pruebas\prueba_ide.txt
+Operador | Arg1         | Arg2 | Resultado
+---------+--------------+------+----------
+FUN      | _inicio      |      |
+LLAMAR   | principal    | 0    |
+RET      |              |      |
+FUN      | principal    |      |
+IMP      | "Hola Mundo" |      |
+ASIG     | 15           |      | n1
+ASIG     | 4            |      | n2
+/        | n1           | n2   | t1
+PARAM    | DEC          |      |
+PARAM    | t1           |      |
+LLAMAR   | CONV         | 2    | div
+IMP      | div          |      |
+RET      |              |      |
+--------------------------------------------

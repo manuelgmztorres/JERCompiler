@@ -1,4 +1,18 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/pegado.txt
+Archivo: pruebas\prueba_ide.txt
 
-Código fuente con errores, no se puede generar el código de tres direcciones.
+FUN _inicio
+        LLAMAR principal, 0
+        RET
+
+FUN principal
+        IMP "Hola Mundo"
+        n1 = 15
+        n2 = 4
+        t1 = n1 / n2
+        PARAM DEC
+        PARAM t1
+        div = LLAMAR CONV, 2
+        IMP div
+        RET
+--------------------------------------------

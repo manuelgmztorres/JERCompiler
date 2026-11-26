@@ -1,4 +1,45 @@
-// TRADUCCIÓN A C++ - JERCompiler
-// Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/pegado.txt
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <string>
 
-// Código fuente con errores, no se puede generar la traducción a C++.
+// Un DEC siempre con punto decimal, como en JER (3.0 y no 3), y con hasta 15 cifras.
+std::string decimal(double d) {
+    std::ostringstream texto;
+    texto << std::setprecision(15) << d;
+    std::string s = texto.str();
+    if (s.find_first_of(".ein") == std::string::npos) s += ".0";
+    return s;
+}
+
+namespace jer {
+
+void _inicio();
+void principal();
+
+void _inicio() {
+    principal();
+    return;
+}
+
+void principal() {
+    int n1 = 0;
+    int n2 = 0;
+    int t1 = 0;
+    double div = 0.0;
+
+    std::cout << "Hola Mundo" << std::endl;
+    n1 = 15;
+    n2 = 4;
+    t1 = 3;
+    div = (double) (3);
+    std::cout << decimal(div) << std::endl;
+    return;
+}
+
+} // namespace jer
+
+int main() {
+    jer::_inicio();
+    return 0;
+}

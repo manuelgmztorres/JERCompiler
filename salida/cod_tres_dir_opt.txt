@@ -1,27 +1,18 @@
 CÓDIGO DE TRES DIRECCIONES - JERCompiler
-Archivo: pruebas\fibonacci.txt
+Archivo: pruebas\prueba_ide.txt
 
 FUN _inicio
         LLAMAR principal, 0
         RET
 
 FUN principal
-        IMP "Numero de Iteraciones"
-        iteraciones = 0
-        OBT iteraciones
-        actual = 0
-        siguiente = 1
-        IMP "______________________________"
-        IMP 0
-        IMP 1
-        i = 0
-  L1:   t1 = i <= iteraciones
-        SALTO_FAL t1, L2
-        suma = actual + siguiente
-        actual = siguiente
-        siguiente = suma
-        IMP siguiente
-        i = i + 1
-        SALTO L1
-  L2:   RET
+        IMP "Hola Mundo"
+        n1 = 15
+        n2 = 4
+        t1 = 3
+        PARAM DEC
+        PARAM 3
+        div = LLAMAR CONV, 2
+        IMP div
+        RET
 --------------------------------------------

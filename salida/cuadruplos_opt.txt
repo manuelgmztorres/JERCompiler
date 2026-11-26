@@ -1,29 +1,18 @@
 TABLA DE CUÁDRUPLOS - JERCompiler
-Archivo: pruebas\fibonacci.txt
-Operador  | Arg1                             | Arg2        | Resultado
-----------+----------------------------------+-------------+------------
-FUN       | _inicio                          |             |
-LLAMAR    | principal                        | 0           |
-RET       |                                  |             |
-FUN       | principal                        |             |
-IMP       | "Numero de Iteraciones"          |             |
-ASIG      | 0                                |             | iteraciones
-OBT       |                                  |             | iteraciones
-ASIG      | 0                                |             | actual
-ASIG      | 1                                |             | siguiente
-IMP       | "______________________________" |             |
-IMP       | 0                                |             |
-IMP       | 1                                |             |
-ASIG      | 0                                |             | i
-ETIQ      |                                  |             | L1
-<=        | i                                | iteraciones | t1
-SALTO_FAL | t1                               |             | L2
-+         | actual                           | siguiente   | suma
-ASIG      | siguiente                        |             | actual
-ASIG      | suma                             |             | siguiente
-IMP       | siguiente                        |             |
-+         | i                                | 1           | i
-SALTO     |                                  |             | L1
-ETIQ      |                                  |             | L2
-RET       |                                  |             |
+Archivo: pruebas\prueba_ide.txt
+Operador | Arg1         | Arg2 | Resultado
+---------+--------------+------+----------
+FUN      | _inicio      |      |
+LLAMAR   | principal    | 0    |
+RET      |              |      |
+FUN      | principal    |      |
+IMP      | "Hola Mundo" |      |
+ASIG     | 15           |      | n1
+ASIG     | 4            |      | n2
+ASIG     | 3            |      | t1
+PARAM    | DEC          |      |
+PARAM    | 3            |      |
+LLAMAR   | CONV         | 2    | div
+IMP      | div          |      |
+RET      |              |      |
 --------------------------------------------

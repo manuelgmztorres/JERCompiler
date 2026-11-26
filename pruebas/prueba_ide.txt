@@ -1,7 +1,7 @@
 FUN VACIO principal(){
     IMP "Hola Mundo";
     ENT n1 -> 15;
-    ENT n2 -> 0;
-    ENT div -> n1 / n2;
+    ENT n2 -> 4;
+    DEC div -> CONV(DEC, n1 / n2);
     IMP div;
 }

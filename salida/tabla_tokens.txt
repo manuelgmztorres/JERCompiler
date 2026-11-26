@@ -1,5 +1,5 @@
 TABLA DE TOKENS - JERCompiler
-Archivo: C:/Users/h_hor/AppData/Local/Temp/claude/9630b69346f27a12/5019981f-902d-4a46-bd52-4d5be0101022/scratchpad/pegado.txt
+Archivo: pruebas\prueba_ide.txt
 No.   | Lexema               | Token                        | Línea  | Columna
 ------+----------------------+------------------------------+--------+--------
 1     | FUN                  | FUN                          | 1      | 1
@@ -19,16 +19,21 @@ No.   | Lexema               | Token                        | Línea  | Columna
 15    | ENT                  | ENT                          | 4      | 5
 16    | n2                   | <IDENTIFICADOR>              | 4      | 9
 17    | ->                   | ->                           | 4      | 12
-18    | 0                    | <NUMERO_ENTERO>              | 4      | 15
+18    | 4                    | <NUMERO_ENTERO>              | 4      | 15
 19    | ;                    | ;                            | 4      | 16
-20    | ENT                  | ENT                          | 5      | 5
+20    | DEC                  | DEC                          | 5      | 5
 21    | div                  | <IDENTIFICADOR>              | 5      | 9
 22    | ->                   | ->                           | 5      | 13
-23    | n1                   | <IDENTIFICADOR>              | 5      | 16
-24    | /                    | /                            | 5      | 19
-25    | n2                   | <IDENTIFICADOR>              | 5      | 21
-26    | ;                    | ;                            | 5      | 23
-27    | IMP                  | IMP                          | 6      | 5
-28    | div                  | <IDENTIFICADOR>              | 6      | 9
-29    | ;                    | ;                            | 6      | 12
-30    | }                    | }                            | 7      | 1
+23    | CONV                 | CONV                         | 5      | 16
+24    | (                    | (                            | 5      | 20
+25    | DEC                  | DEC                          | 5      | 21
+26    | ,                    | ,                            | 5      | 24
+27    | n1                   | <IDENTIFICADOR>              | 5      | 26
+28    | /                    | /                            | 5      | 29
+29    | n2                   | <IDENTIFICADOR>              | 5      | 31
+30    | )                    | )                            | 5      | 33
+31    | ;                    | ;                            | 5      | 34
+32    | IMP                  | IMP                          | 6      | 5
+33    | div                  | <IDENTIFICADOR>              | 6      | 9
+34    | ;                    | ;                            | 6      | 12
+35    | }                    | }                            | 7      | 1
